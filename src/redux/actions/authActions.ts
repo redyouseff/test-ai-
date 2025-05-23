@@ -89,23 +89,51 @@ export const logout = () => (dispatch: Dispatch) => {
 export const fetchProfile = () => async (dispatch: Dispatch, getState: any) => {
   try {
     dispatch({ type: AUTH_LOADING });
+    
+    // الحصول على التوكن من Redux state أو localStorage
     const { token } = getState().auth;
+    const storedToken = localStorage.getItem('token');
+    const authToken = token || storedToken;
+
+    if (!authToken) {
+      throw new Error('لم يتم العثور على توكن المصادقة');
+    }
+
     const response = await api.get('/api/v1/users/me', {
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${authToken}` }
     });
 
+    // تحديث Redux state
     dispatch({
       type: AUTH_SUCCESS,
       payload: {
-        user: response.data.user,
-        token
+        user: response.data.data,
+        token: authToken
       }
     });
-    localStorage.setItem('user', JSON.stringify(response.data.user));
+    
+    // تحديث localStorage
+    localStorage.setItem('user', JSON.stringify(response.data.data));
+    if (!token) {
+      localStorage.setItem('token', authToken);
+    }
   } catch (error: any) {
-    dispatch({
-      type: AUTH_ERROR,
-      payload: error.response?.data?.message || 'Failed to fetch profile'
-    });
+    // في حالة الخطأ، نحاول استعادة البيانات من localStorage
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      dispatch({
+        type: AUTH_SUCCESS,
+        payload: {
+          user: JSON.parse(storedUser),
+          token: localStorage.getItem('token')
+        }
+      });
+    } else {
+      dispatch({
+        type: AUTH_ERROR,
+        payload: error.response?.data?.message || 'فشل في جلب الملف الشخصي'
+      });
+    }
+    console.log("fetchProfile: error=", error); // debug
   }
 }; 

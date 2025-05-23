@@ -7,4 +7,5 @@ const store = createStore(
   applyMiddleware(thunk)
 );
 
+export type AppDispatch = typeof store.dispatch;
 export default store; 

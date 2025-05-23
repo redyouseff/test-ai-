@@ -23,13 +23,35 @@ const Dashboard = () => {
   const [connectedUsers, setConnectedUsers] = useState<(DoctorProfile | PatientProfile)[]>([]);
   const [showAIAssistant, setShowAIAssistant] = useState(false);
   const [patientFiles, setPatientFiles] = useState<DiagnosticFile[]>([]);
+  const [loading, setLoading] = useState(true);
   const dispatch = useDispatch();
- console.log(localStorage.getItem("user"));
+
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem('user');
+    const storedToken = localStorage.getItem('token');
+
+    if (storedUser && storedToken) {
+      dispatch({
+        type: 'AUTH_SUCCESS',
+        payload: {
+          user: JSON.parse(storedUser),
+          token: storedToken
+        }
+      });
+      setLoading(false); // أوقف التحميل فوراً
+    } else {
+      dispatch(fetchProfile() as any).finally(() => setLoading(false));
+    }
+  }, [dispatch]);
 
   useEffect(() => {
     if (!user) return;
 
-    // Filter appointments based on user role
+    // حفظ بيانات المستخدم في localStorage عند التحديث
+    localStorage.setItem('user', JSON.stringify(user));
+    
+    // باقي الكود الموجود...
     const userAppointments = mockAppointments.filter((appointment) => {
       if (user.role === 'patient') {
         return appointment.patientId === user.id;
@@ -70,15 +92,7 @@ const Dashboard = () => {
       });
       setConnectedUsers(doctorPatients);
     }
-
-    if (user) {
-      localStorage.setItem('user', JSON.stringify(user));
-    }
   }, [user]);
-
-  useEffect(() => {
-    dispatch(fetchProfile() as any);
-  }, [dispatch]);
 
   const formatDate = (dateString: string) => {
     const options: Intl.DateTimeFormatOptions = {
@@ -102,6 +116,14 @@ const Dashboard = () => {
     const patient = mockPatients.find((p) => p.id === patientId);
     return patient ? patient.name : 'Unknown Patient';
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p>جاري التحميل...</p>
+      </div>
+    );
+  }
 
   if (!user) {
     return (
