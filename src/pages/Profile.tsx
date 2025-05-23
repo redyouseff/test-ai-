@@ -19,23 +19,37 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from '@/hooks/use-toast';
-import { FileText, User as UserIcon } from 'lucide-react';
+import { FileText, User as UserIcon, Star, StarHalf } from 'lucide-react';
 import axios from 'axios';
 import { Badge } from "@/components/ui/badge";
 
-// Extend the User interface from your types
+interface WorkingHour {
+  day: string;
+  from: string;
+  to: string;
+}
+
+// Update ExtendedUser interface to include all required fields
 interface ExtendedUser {
-  id: string;
-  name: string;
+  _id: string;
+  fullName: string;
   email: string;
+  phoneNumber: string;
+  gender: string;
+  chronicDiseases: string[];
+  currentMedications: string[];
+  specialty: string;
+  clinicLocation: string;
+  certifications: string[];
+  workingHours: WorkingHour[];
+  availability: string[];
   role: string;
+  medicalDocuments: string[];
+  averageRating?: number;
+  numberOfReviews?: number;
   profileImage?: string;
-  specialty?: string;
-  experience?: number;
-  phone?: string;
-  workPlace?: string;
-  bio?: string;
-  certifications?: string[];
+  ProfessionalBio?: string;
+  YearsOfExperience?: number;
 }
 
 const Profile = () => {
@@ -44,15 +58,148 @@ const Profile = () => {
   const { toast } = useToast();
   
   const [isEditing, setIsEditing] = useState(false);
+  const [isEditingHours, setIsEditingHours] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [editedData, setEditedData] = useState<Partial<ExtendedUser>>({});
+  const [editedHours, setEditedHours] = useState<WorkingHour[]>([]);
+  const [newCertification, setNewCertification] = useState('');
 
   useEffect(() => {
     dispatch(fetchProfile() as any);
   }, [dispatch]);
-  
+
+  useEffect(() => {
+    if (user) {
+      setEditedData({
+        fullName: user.fullName,
+        email: user.email,
+        phoneNumber: user.phoneNumber,
+        clinicLocation: user.clinicLocation,
+        specialty: user.specialty,
+        certifications: user.certifications,
+        workingHours: user.workingHours,
+      });
+      setEditedHours(user.workingHours || []);
+    }
+  }, [user]);
+
+  const handleInputChange = (name: string, value: string | string[] | number) => {
+    setEditedData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleAddCertification = () => {
+    if (newCertification.trim()) {
+      setEditedData(prev => ({
+        ...prev,
+        certifications: [...(prev.certifications || []), newCertification.trim()]
+      }));
+      setNewCertification('');
+    }
+  };
+
+  const handleRemoveCertification = (index: number) => {
+    setEditedData(prev => ({
+      ...prev,
+      certifications: prev.certifications?.filter((_, i) => i !== index) || []
+    }));
+  };
+
+  const handleSaveChanges = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await axios.patch(
+        'https://care-insight-api-9ed25d3ea3ea.herokuapp.com/api/v1/users/me',
+        {
+          fullName: editedData.fullName,
+          phoneNumber: editedData.phoneNumber,
+          gender: editedData.gender,
+          specialty: editedData.specialty,
+          clinicLocation: editedData.clinicLocation,
+          certifications: editedData.certifications,
+          ProfessionalBio: editedData.ProfessionalBio,
+          YearsOfExperience: editedData.YearsOfExperience
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (response.status === 200) {
+        toast({
+          title: "Success",
+          description: "Professional information has been updated successfully.",
+          variant: "default",
+          className: "bg-green-500 text-white border-none"
+        });
+        
+        // Short delay before reloading to ensure the toast is visible
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
+      }
+    } catch (error: unknown) {
+      let errorMessage = "Failed to update profile information.";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
+  };
 
   console.log(user);
 
+  const renderStars = (rating: number) => {
+    const stars = [];
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating % 1 >= 0.5;
+
+    // Add full stars
+    for (let i = 0; i < fullStars; i++) {
+      stars.push(
+        <Star 
+          key={`star-${i}`} 
+          className="w-5 h-5 fill-yellow-400 text-yellow-400" 
+        />
+      );
+    }
+
+    // Add half star if needed
+    if (hasHalfStar) {
+      stars.push(
+        <StarHalf 
+          key="half-star" 
+          className="w-5 h-5 fill-yellow-400 text-yellow-400" 
+        />
+      );
+    }
+
+    // Add empty stars to make total of 5
+    const emptyStars = 5 - Math.ceil(rating);
+    for (let i = 0; i < emptyStars; i++) {
+      stars.push(
+        <Star 
+          key={`empty-star-${i}`} 
+          className="w-5 h-5 text-gray-300" 
+        />
+      );
+    }
+
+    return stars;
+  };
 
   if (loading) return (
     <DashboardLayout>
@@ -174,6 +321,97 @@ const Profile = () => {
       console.error('Upload error:', error);
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const formatTime = (time: string) => {
+    if (!time) return '';
+    const [hours, minutes] = time.split(':');
+    const hour = parseInt(hours);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const formattedHour = hour % 12 || 12;
+    return `${formattedHour.toString().padStart(2, '0')}:${minutes} ${ampm}`;
+  };
+
+  const parseTime = (timeStr: string) => {
+    if (!timeStr) return '';
+    const [time, period] = timeStr.split(' ');
+    const [hours, minutes] = time.split(':');
+    let hour = parseInt(hours);
+    
+    if (period === 'PM' && hour !== 12) {
+      hour += 12;
+    } else if (period === 'AM' && hour === 12) {
+      hour = 0;
+    }
+    
+    return `${hour.toString().padStart(2, '0')}:${minutes}`;
+  };
+
+  const handleHoursChange = (index: number, field: keyof WorkingHour, value: string) => {
+    setEditedHours(prev => {
+      const newHours = [...prev];
+      if (field === 'from' || field === 'to') {
+        // For time fields, store in 24h format
+        newHours[index] = { 
+          ...newHours[index], 
+          [field]: value ? formatTime(value) : ''
+        };
+      } else {
+        newHours[index] = { ...newHours[index], [field]: value };
+      }
+      return newHours;
+    });
+  };
+
+  const handleSaveHours = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      // Format the working hours for the API
+      const formattedHours = editedHours.map(hour => ({
+        day: hour.day,
+        from: parseTime(hour.from),
+        to: parseTime(hour.to)
+      }));
+
+      const response = await axios.patch(
+        'https://care-insight-api-9ed25d3ea3ea.herokuapp.com/api/v1/users/updateWorkingHours',
+        { workingHours: formattedHours },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (response.status === 200) {
+        toast({
+          title: "Success",
+          description: "Working hours have been updated successfully.",
+          variant: "default",
+        });
+        setIsEditingHours(false);
+        
+        // Update the local state with the new working hours
+        if (response.data?.data?.workingHours) {
+          setEditedHours(response.data.data.workingHours);
+        }
+      }
+    } catch (error: unknown) {
+      let errorMessage = "Failed to update working hours.";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
     }
   };
 
@@ -570,7 +808,7 @@ const Profile = () => {
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
-              {['Monday', 'Tuesday', 'Thursday', 'Friday'].map((day) => (
+              {user?.availability?.map((day) => (
                 <Badge 
                   key={day}
                   variant="secondary" 
@@ -596,6 +834,54 @@ const Profile = () => {
     );
   }
 
+  const renderCertificationsSection = () => (
+    <div className="col-span-2">
+      <Label className="text-sm font-medium text-gray-500 mb-2">Certifications</Label>
+      {isEditing ? (
+        <div className="space-y-4">
+          <div className="flex gap-2">
+            <Input
+              value={newCertification}
+              onChange={(e) => setNewCertification(e.target.value)}
+              placeholder="Enter new certification"
+              className="flex-1"
+            />
+            <Button
+              type="button"
+              onClick={handleAddCertification}
+              className="bg-primary text-white"
+            >
+              Add
+            </Button>
+          </div>
+          <div className="space-y-2">
+            {editedData.certifications?.map((cert, index) => (
+              <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                <span>{cert}</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
+                  onClick={() => handleRemoveCertification(index)}
+                >
+                  ×
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-1">
+          {user?.certifications?.map((cert, index) => (
+            <div key={index} className="text-base text-gray-900 bg-gray-50 p-2 rounded">
+              {cert}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <DashboardLayout>
       <div className="min-h-screen bg-gray-50/30">
@@ -611,7 +897,7 @@ const Profile = () => {
                     {user.profileImage ? (
                       <img 
                         src={user.profileImage} 
-                        alt={user.name} 
+                        alt={user.fullName} 
                         className="w-full h-full rounded-full object-cover" 
                       />
                     ) : (
@@ -625,8 +911,8 @@ const Profile = () => {
                       </div>
                     )}
                   </div>
-                  <h2 className="text-2xl font-semibold text-gray-900 mb-1">Dr.</h2>
-                  <p className="text-gray-500 text-lg mb-6">doctor</p>
+                  <h2 className="text-2xl font-semibold text-gray-900 mb-1">{user?.fullName}</h2>
+                  <p className="text-gray-500 text-lg mb-6">{user?.role}</p>
                   <input
                     type="file"
                     id="profile-image"
@@ -672,66 +958,148 @@ const Profile = () => {
                       <div>
                         <h3 className="text-xl font-semibold text-gray-900 mb-8">Professional Information</h3>
                         <div className="grid grid-cols-2 gap-x-16 gap-y-8">
-                          <div>
-                            <p className="text-sm font-medium text-gray-500 mb-2">Full Name</p>
-                            <p className="text-base text-gray-900">Dr. ahmed</p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-500 mb-2">Email</p>
-                            <p className="text-base text-gray-900">rmdanyoussef2@gmail.com</p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-500 mb-2">Phone</p>
-                            <p className="text-base text-gray-900">+201234567891</p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-500 mb-2">Work Place</p>
-                            <p className="text-base text-gray-900">123 Health St, Cairo</p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-500 mb-2">Specialty</p>
-                            <p className="text-base text-gray-900">{(user as ExtendedUser)?.specialty || 'Not specified'}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-500 mb-2">Years of Experience</p>
-                            <p className="text-base text-gray-900">years</p>
-                          </div>
-                          <div className="col-span-2">
-                            <p className="text-sm font-medium text-gray-500 mb-2">Professional Bio</p>
-                            <p className="text-base text-gray-900 leading-relaxed">Dr. undefined is a leading neurologist specializing in brain cancer treatment with undefined years of experience.</p>
-                          </div>
-                          <div className="col-span-2">
-                            <p className="text-sm font-medium text-gray-500 mb-2">Certifications</p>
-                            <ul className="list-disc pl-5 space-y-1">
-                              <li className="text-base text-gray-900">Board Certified</li>
-                              <li className="text-base text-gray-900">PhD</li>
-                            </ul>
-                          </div>
+                          {isEditing ? (
+                            <>
+                              <div>
+                                <Label className="text-sm font-medium text-gray-500 mb-2">Full Name</Label>
+                                <Input
+                                  value={editedData.fullName || ''}
+                                  onChange={(e) => handleInputChange('fullName', e.target.value)}
+                                  className="mt-1"
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-sm font-medium text-gray-500 mb-2">Email</Label>
+                                <Input
+                                  value={editedData.email || ''}
+                                  onChange={(e) => handleInputChange('email', e.target.value)}
+                                  className="mt-1"
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-sm font-medium text-gray-500 mb-2">Phone</Label>
+                                <Input
+                                  value={editedData.phoneNumber || ''}
+                                  onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
+                                  className="mt-1"
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-sm font-medium text-gray-500 mb-2">Work Place</Label>
+                                <Input
+                                  value={editedData.clinicLocation || ''}
+                                  onChange={(e) => handleInputChange('clinicLocation', e.target.value)}
+                                  className="mt-1"
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-sm font-medium text-gray-500 mb-2">Specialty</Label>
+                                <Input
+                                  value={editedData.specialty || ''}
+                                  onChange={(e) => handleInputChange('specialty', e.target.value)}
+                                  className="mt-1"
+                                />
+                              </div>
+                              {renderCertificationsSection()}
+                            </>
+                          ) : (
+                            <>
+                              <div>
+                                <p className="text-sm font-medium text-gray-500 mb-2">Full Name</p>
+                                <p className="text-base text-gray-900">{user?.fullName}</p>
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-gray-500 mb-2">Email</p>
+                                <p className="text-base text-gray-900">{user?.email}</p>
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-gray-500 mb-2">Phone</p>
+                                <p className="text-base text-gray-900">{user?.phoneNumber}</p>
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-gray-500 mb-2">Work Place</p>
+                                <p className="text-base text-gray-900">{user?.clinicLocation}</p>
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-gray-500 mb-2">Specialty</p>
+                                <p className="text-base text-gray-900">{user?.specialty || 'Not specified'}</p>
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-gray-500 mb-2">Rating</p>
+                                <div className="flex items-center gap-2">
+                                  <div className="flex">
+                                    {renderStars(user?.averageRating || 0)}
+                                  </div>
+                                  <p className="text-base text-gray-900">
+                                    ({user?.numberOfReviews || 0} {user?.numberOfReviews === 1 ? 'review' : 'reviews'})
+                                  </p>
+                                </div>
+                              </div>
+                              {renderCertificationsSection()}
+                            </>
+                          )}
                         </div>
 
-                        <Button 
-                          className="mt-10 bg-primary/10 hover:bg-primary/20 text-primary font-medium px-6"
-                          variant="ghost"
-                          size="lg"
-                        >
-                          Edit Information
-                        </Button>
+                        <div className="mt-10 flex gap-4">
+                          {isEditing ? (
+                            <>
+                              <Button 
+                                className="bg-primary text-white font-medium px-6"
+                                size="lg"
+                                onClick={handleSaveChanges}
+                              >
+                                Save Changes
+                              </Button>
+                              <Button 
+                                variant="outline"
+                                size="lg"
+                                onClick={() => {
+                                  setIsEditing(false);
+                                  // Reset edited data to original user data
+                                  if (user) {
+                                    setEditedData({
+                                      fullName: user.fullName,
+                                      email: user.email,
+                                      phoneNumber: user.phoneNumber,
+                                      clinicLocation: user.clinicLocation,
+                                      specialty: user.specialty,
+                                      certifications: user.certifications,
+                                      workingHours: user.workingHours,
+                                    });
+                                  }
+                                }}
+                              >
+                                Cancel
+                              </Button>
+                            </>
+                          ) : (
+                            <Button 
+                              className="bg-primary/10 hover:bg-primary/20 text-primary font-medium px-6"
+                              variant="ghost"
+                              size="lg"
+                              onClick={() => setIsEditing(true)}
+                            >
+                              Edit Information
+                            </Button>
+                          )}
+                        </div>
                       </div>
 
                       <div>
                         <h3 className="text-xl font-semibold text-gray-900 mb-8">Availability</h3>
-                        <div className="flex flex-wrap gap-3">
-                          {['Monday', 'Tuesday', 'Thursday', 'Friday'].map((day) => (
+                        <div className="flex flex-wrap gap-2">
+                          {user?.availability?.map((day) => (
                             <Badge 
                               key={day}
                               variant="secondary" 
-                              className="bg-primary/10 hover:bg-primary/15 text-primary px-6 py-1.5 text-sm font-medium rounded-full"
+                              className="bg-primary/10 hover:bg-primary/20 text-primary"
                             >
                               {day}
                             </Badge>
                           ))}
                         </div>
                       </div>
+
                     </div>
                   </TabsContent>
                   
@@ -762,6 +1130,85 @@ const Profile = () => {
                   </TabsContent>
                 </Tabs>
               </div>
+            </div>
+
+            {/* Working Hours Section */}
+            <div className="mt-8 bg-white rounded-lg border border-gray-100 p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-semibold text-gray-900">Working Hours</h2>
+                {!isEditingHours ? (
+                  <Button 
+                    onClick={() => setIsEditingHours(true)}
+                    variant="outline"
+                    className="bg-primary/10 hover:bg-primary/20 text-primary"
+                  >
+                    Edit Working Hours
+                  </Button>
+                ) : (
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={handleSaveHours}
+                      className="bg-primary text-white"
+                    >
+                      Save Changes
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      onClick={() => {
+                        setIsEditingHours(false);
+                        setEditedHours(user?.workingHours || []);
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {isEditingHours ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {editedHours.map((hour, index) => (
+                    <div key={index} className="bg-gray-50/80 p-4 rounded-lg space-y-4">
+                      <div className="flex justify-between items-center">
+                        <Label className="text-base font-medium">{hour.day}</Label>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label className="text-sm text-gray-500">From</Label>
+                          <Input
+                            type="time"
+                            value={parseTime(hour.from)}
+                            onChange={(e) => handleHoursChange(index, 'from', e.target.value)}
+                            className="mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm text-gray-500">To</Label>
+                          <Input
+                            type="time"
+                            value={parseTime(hour.to)}
+                            onChange={(e) => handleHoursChange(index, 'to', e.target.value)}
+                            className="mt-1"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {editedHours.map((hour, index) => (
+                    hour.from && hour.to ? (
+                      <div key={index} className="bg-gray-50/80 p-4 rounded-lg">
+                        <div className="flex flex-col">
+                          <p className="font-medium text-gray-900 mb-2">{hour.day}</p>
+                          <p className="text-sm text-gray-500">{hour.from} - {hour.to}</p>
+                        </div>
+                      </div>
+                    ) : null
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
