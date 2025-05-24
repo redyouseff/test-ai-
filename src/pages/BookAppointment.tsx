@@ -199,14 +199,17 @@ const BookAppointment = () => {
 
     try {
       const token = localStorage.getItem('token');
+      
+      // Format the date to YYYY-MM-DD
+      const formattedDate = format(selectedDate, 'yyyy-MM-dd');
+
       const response = await axios.post(
         'https://care-insight-api-9ed25d3ea3ea.herokuapp.com/api/v1/appointments',
         {
-          doctorId,
-          date: selectedDate.toISOString(),
-          time: selectedTime,
-          reason,
-          notes
+          doctor: doctorId, // Using the doctor's ID from the URL params
+          appointmentDate: formattedDate,
+          reasonForVisit: reason,
+          notes: notes || undefined // Only include notes if they exist
         },
         {
           headers: {
@@ -216,10 +219,10 @@ const BookAppointment = () => {
         }
       );
 
-      if (response.status === 201) {
+      if (response.status === 201 || response.status === 200) {
         toast({
           title: "Appointment Booked Successfully",
-          description: `Your appointment with Dr. ${doctor?.fullName} has been scheduled for ${selectedDate.toLocaleDateString()} at ${formatTime(selectedTime)}.`,
+          description: `Your appointment with Dr. ${doctor?.fullName} has been scheduled for ${format(selectedDate, 'MMMM dd, yyyy')} at ${formatTime(selectedTime)}.`,
         });
         navigate('/dashboard');
       }
