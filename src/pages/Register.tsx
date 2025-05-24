@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import Layout from '../components/layout/Layout';
-import { useDispatch, useSelector } from 'react-redux';
-import { register as reduxRegister } from '../redux/actions/authActions';
-import { RootState } from '../redux/types';
+import { useDispatch } from 'react-redux';
+import axios from 'axios';
 import { useToast } from '@/hooks/use-toast';
+import { UserRole } from '../types';
+import { Loader2 } from 'lucide-react';
+import { AxiosError } from 'axios';
 
 import {
   Form,
@@ -29,16 +31,15 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { UserRole } from '../types';
 
 const patientSchema = z.object({
-  name: z.string().min(2, {
+  fullName: z.string().min(2, {
     message: "Name must be at least 2 characters.",
   }),
   email: z.string().email({
     message: "Please enter a valid email address.",
   }),
-  phone: z.string().min(10, {
+  phoneNumber: z.string().min(10, {
     message: "Phone number must be at least 10 digits.",
   }),
   gender: z.enum(["male", "female", "other"]),
@@ -49,44 +50,39 @@ const patientSchema = z.object({
     message: "Password must be at least 6 characters.",
   }),
   confirmPassword: z.string(),
-  // New Medical Information Fields
   height: z.string().optional(),
   weight: z.string().optional(),
   bloodType: z.enum(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]).optional(),
   medicalCondition: z.string().optional(),
   chronicDiseases: z.string().optional(),
-  medications: z.string().optional(),
+  currentMedications: z.string().optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
 });
 
 const doctorSchema = z.object({
-  name: z.string().min(2, {
+  fullName: z.string().min(2, {
     message: "Name must be at least 2 characters.",
   }),
   email: z.string().email({
     message: "Please enter a valid email address.",
   }),
-  phone: z.string().min(10, {
+  phoneNumber: z.string().min(10, {
     message: "Phone number must be at least 10 digits.",
   }),
-  specialty: z.string().min(1, {
+  gender: z.enum(["male", "female", "other"]),
+  specialtyId: z.string().min(1, {
     message: "Please select a specialty.",
   }),
-  workPlace: z.string().min(2, {
-    message: "Work place must be at least 2 characters.",
+  clinicLocation: z.string().min(2, {
+    message: "Clinic location must be at least 2 characters.",
   }),
   password: z.string().min(6, {
     message: "Password must be at least 6 characters.",
   }),
   confirmPassword: z.string(),
-  // New Doctor Fields
   certifications: z.string().optional(),
-  clinicLocation: z.string().optional(),
-  availableDays: z.string().array().optional(),
-  availableStartTime: z.string().optional(),
-  availableEndTime: z.string().optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
@@ -95,12 +91,48 @@ const doctorSchema = z.object({
 type PatientFormValues = z.infer<typeof patientSchema>;
 type DoctorFormValues = z.infer<typeof doctorSchema>;
 
+// Add interface for specialty
+interface Specialty {
+  _id: string;
+  name: string;
+  description: string;
+}
+
 const Register = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { toast } = useToast();
   const [activeRole, setActiveRole] = useState<UserRole>("patient");
+  const [loading, setLoading] = useState(false);
+  const [specialties, setSpecialties] = useState<Specialty[]>([]);
+  const [loadingSpecialties, setLoadingSpecialties] = useState(false);
   
+  // Fetch specialties when component mounts
+  useEffect(() => {
+    const fetchSpecialties = async () => {
+      setLoadingSpecialties(true);
+      try {
+        const response = await axios.get('https://care-insight-api-9ed25d3ea3ea.herokuapp.com/api/v1/specialties');
+        console.log('Specialties response:', response.data);
+        if (response.data.data) {
+          setSpecialties(response.data.data);
+        }
+      } catch (error) {
+        const err = error as AxiosError;
+        console.error('Error fetching specialties:', err);
+        toast({
+          title: "Error",
+          description: "Failed to load specialties. Please refresh the page.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoadingSpecialties(false);
+      }
+    };
+
+    fetchSpecialties();
+  }, [toast]);
+
   // Add state for doctor work hours
   const [workHours, setWorkHours] = useState<{
     [key: string]: { enabled: boolean, start: string, end: string }
@@ -117,9 +149,9 @@ const Register = () => {
   const patientForm = useForm<PatientFormValues>({
     resolver: zodResolver(patientSchema),
     defaultValues: {
-      name: "",
+      fullName: "",
       email: "",
-      phone: "",
+      phoneNumber: "",
       gender: "male",
       age: "",
       password: "",
@@ -129,93 +161,153 @@ const Register = () => {
       bloodType: undefined,
       medicalCondition: "",
       chronicDiseases: "",
-      medications: "",
+      currentMedications: "",
     },
   });
 
   const doctorForm = useForm<DoctorFormValues>({
     resolver: zodResolver(doctorSchema),
     defaultValues: {
-      name: "",
+      fullName: "",
       email: "",
-      phone: "",
-      specialty: "",
-      workPlace: "",
+      phoneNumber: "",
+      gender: "male",
+      specialtyId: "",
+      clinicLocation: "",
       password: "",
       confirmPassword: "",
       certifications: "",
-      clinicLocation: "",
-      availableDays: [],
-      availableStartTime: "09:00",
-      availableEndTime: "17:00",
     },
   });
 
   const onPatientSubmit = async (values: PatientFormValues) => {
+    setLoading(true);
     const userData = {
-      name: values.name,
+      fullName: values.fullName,
       email: values.email,
-      phone: values.phone,
+      phoneNumber: values.phoneNumber,
       gender: values.gender,
+      password: values.password,
       age: parseInt(values.age),
-      role: "patient" as UserRole,
       height: values.height ? parseInt(values.height) : undefined,
       weight: values.weight ? parseInt(values.weight) : undefined,
       bloodType: values.bloodType,
       medicalCondition: values.medicalCondition,
       chronicDiseases: values.chronicDiseases ? values.chronicDiseases.split(',').map(item => item.trim()) : [],
-      medications: values.medications ? values.medications.split(',').map(item => item.trim()) : [],
-      password: values.password
+      currentMedications: values.currentMedications ? values.currentMedications.split(',').map(item => item.trim()) : []
     };
+
     try {
-      await dispatch<any>(reduxRegister(userData));
+      console.log('Sending patient registration request:', userData);
+      const response = await axios.post(
+        'https://care-insight-api-9ed25d3ea3ea.herokuapp.com/api/v1/auth/register', 
+        userData,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          withCredentials: true
+        }
+      );
+      console.log('Patient registration response:', response.data);
+      
+      if (response.data.token) {
+        localStorage.setItem('token', response.data.token);
+        if (dispatch) {
+          dispatch({ type: 'SET_USER', payload: response.data.user });
+        }
+      }
+      
       toast({
         title: "Registration successful",
         description: "Your patient account has been created.",
       });
       navigate('/dashboard');
-    } catch (err) {
+    } catch (error) {
+      const err = error as AxiosError<{ message?: string }>;
+      console.error('Patient registration error:', err);
+      console.error('Error response:', err.response?.data);
+      const errorMessage = err.response?.data?.message || 
+                         (err.response?.data as { error?: string })?.error || 
+                         err.message || 
+                         "There was an error creating your account. Please try again.";
       toast({
         title: "Registration failed",
-        description: "There was an error creating your account. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
   };
 
   const onDoctorSubmit = async (values: DoctorFormValues) => {
-    // Format available hours based on the workHours state
-    const availableDays = Object.entries(workHours)
+    setLoading(true);
+    
+    // Format working hours from the workHours state
+    const workingHours = Object.entries(workHours)
       .filter(([_, value]) => value.enabled)
-      .map(([day, _]) => day);
+      .map(([day, hours]) => ({
+        day,
+        from: hours.start,
+        to: hours.end
+      }));
 
     const userData = {
-      name: values.name,
+      fullName: values.fullName,
       email: values.email,
-      phone: values.phone,
-      specialty: values.specialty,
-      workPlace: values.workPlace,
-      role: "doctor" as UserRole,
-      certifications: values.certifications,
+      phoneNumber: values.phoneNumber,
+      gender: values.gender,
+      password: values.password,
+      specialtyId: values.specialtyId,
       clinicLocation: values.clinicLocation,
-      availableDays,
-      availableStartTime: values.availableStartTime,
-      availableEndTime: values.availableEndTime,
-      password: values.password
+      certifications: values.certifications ? values.certifications.split(',').map(cert => cert.trim()) : [],
+      workingHours
     };
+
     try {
-      await dispatch<any>(reduxRegister(userData));
+      console.log('Sending doctor registration request:', userData);
+      const response = await axios.post(
+        'https://care-insight-api-9ed25d3ea3ea.herokuapp.com/api/v1/auth/registerDoctor', 
+        userData,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          withCredentials: true
+        }
+      );
+      console.log('Doctor registration response:', response.data);
+      
+      if (response.data.token) {
+        localStorage.setItem('token', response.data.token);
+        if (dispatch) {
+          dispatch({ type: 'SET_USER', payload: response.data.user });
+        }
+      }
+      
       toast({
         title: "Registration successful",
         description: "Your doctor account has been created.",
       });
       navigate('/dashboard');
-    } catch (err) {
+    } catch (error) {
+      const err = error as AxiosError<{ message?: string }>;
+      console.error('Doctor registration error:', err);
+      console.error('Error response:', err.response?.data);
+      const errorMessage = err.response?.data?.message || 
+                         (err.response?.data as { error?: string })?.error || 
+                         err.message || 
+                         "There was an error creating your account. Please try again.";
       toast({
         title: "Registration failed",
-        description: "There was an error creating your account. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -258,7 +350,7 @@ const Register = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <FormField
                         control={patientForm.control}
-                        name="name"
+                        name="fullName"
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Full Name</FormLabel>
@@ -286,12 +378,12 @@ const Register = () => {
 
                       <FormField
                         control={patientForm.control}
-                        name="phone"
+                        name="phoneNumber"
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Phone Number</FormLabel>
                             <FormControl>
-                              <Input placeholder="123-456-7890" {...field} />
+                              <Input placeholder="+201234567890" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -445,7 +537,7 @@ const Register = () => {
 
                       <FormField
                         control={patientForm.control}
-                        name="medications"
+                        name="currentMedications"
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Current Medications</FormLabel>
@@ -504,7 +596,11 @@ const Register = () => {
                       className="w-full bg-primary hover:bg-primary-dark text-white" 
                       disabled={loading}
                     >
-                      {loading ? 'Creating Account...' : 'Register as Patient'}
+                      {loading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        'Register as Patient'
+                      )}
                     </Button>
                   </div>
                 </form>
@@ -519,7 +615,7 @@ const Register = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <FormField
                         control={doctorForm.control}
-                        name="name"
+                        name="fullName"
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Full Name</FormLabel>
@@ -547,12 +643,12 @@ const Register = () => {
 
                       <FormField
                         control={doctorForm.control}
-                        name="phone"
+                        name="phoneNumber"
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Phone Number</FormLabel>
                             <FormControl>
-                              <Input placeholder="123-456-7890" {...field} />
+                              <Input placeholder="+201234567890" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -561,23 +657,23 @@ const Register = () => {
 
                       <FormField
                         control={doctorForm.control}
-                        name="specialty"
+                        name="gender"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Cancer Specialty</FormLabel>
+                            <FormLabel>Gender</FormLabel>
                             <Select 
                               onValueChange={field.onChange} 
                               defaultValue={field.value}
                             >
                               <FormControl>
                                 <SelectTrigger>
-                                  <SelectValue placeholder="Select specialty" />
+                                  <SelectValue placeholder="Select gender" />
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                <SelectItem value="brain-cancer">Brain Cancer</SelectItem>
-                                <SelectItem value="skin-cancer">Skin Cancer</SelectItem>
-                                <SelectItem value="chest-cancer">Chest Cancer</SelectItem>
+                                <SelectItem value="male">Male</SelectItem>
+                                <SelectItem value="female">Female</SelectItem>
+                                <SelectItem value="other">Other</SelectItem>
                               </SelectContent>
                             </Select>
                             <FormMessage />
@@ -587,13 +683,31 @@ const Register = () => {
 
                       <FormField
                         control={doctorForm.control}
-                        name="workPlace"
+                        name="specialtyId"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Work Place</FormLabel>
-                            <FormControl>
-                              <Input placeholder="City Hospital" {...field} />
-                            </FormControl>
+                            <FormLabel>Cancer Specialty</FormLabel>
+                            <Select 
+                              onValueChange={field.onChange} 
+                              defaultValue={field.value}
+                              disabled={loadingSpecialties}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder={loadingSpecialties ? "Loading specialties..." : "Select specialty"} />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {specialties.map((specialty) => (
+                                  <SelectItem 
+                                    key={specialty._id} 
+                                    value={specialty._id}
+                                  >
+                                    {specialty.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -638,50 +752,53 @@ const Register = () => {
                       )}
                     />
 
-                    <div className="mt-6">
-                      <h3 className="text-md font-medium mb-4">Working Hours</h3>
-                      <div className="space-y-4">
-                        {Object.entries(workHours).map(([day, hours]) => (
-                          <div key={day} className="flex flex-col md:flex-row gap-4 p-3 border rounded-md">
-                            <div className="flex items-center">
-                              <input
-                                type="checkbox"
-                                id={`day-${day}`}
-                                checked={hours.enabled}
-                                onChange={(e) => handleWorkHoursChange(day, 'enabled', e.target.checked)}
-                                className="mr-2 rounded border-gray-300 text-primary focus:ring-primary"
-                              />
-                              <label htmlFor={`day-${day}`} className="w-24">{day}</label>
-                            </div>
-                            
-                            <div className="flex flex-1 gap-4 items-center">
-                              <div className="flex-1">
-                                <label htmlFor={`start-${day}`} className="text-sm text-muted-foreground">Start</label>
-                                <Input
-                                  id={`start-${day}`}
-                                  type="time"
-                                  value={hours.start}
-                                  onChange={(e) => handleWorkHoursChange(day, 'start', e.target.value)}
-                                  disabled={!hours.enabled}
-                                  className="mt-1"
+                    {/* Working Hours Section */}
+                    {activeRole === 'doctor' && (
+                      <div className="mt-6">
+                        <h3 className="text-md font-medium mb-4">Working Hours</h3>
+                        <div className="space-y-4">
+                          {Object.entries(workHours).map(([day, hours]) => (
+                            <div key={day} className="flex flex-col md:flex-row gap-4 p-3 border rounded-md">
+                              <div className="flex items-center">
+                                <input
+                                  type="checkbox"
+                                  id={`day-${day}`}
+                                  checked={hours.enabled}
+                                  onChange={(e) => handleWorkHoursChange(day, 'enabled', e.target.checked)}
+                                  className="mr-2 rounded border-gray-300 text-primary focus:ring-primary"
                                 />
+                                <label htmlFor={`day-${day}`} className="w-24">{day}</label>
                               </div>
-                              <div className="flex-1">
-                                <label htmlFor={`end-${day}`} className="text-sm text-muted-foreground">End</label>
-                                <Input
-                                  id={`end-${day}`}
-                                  type="time"
-                                  value={hours.end}
-                                  onChange={(e) => handleWorkHoursChange(day, 'end', e.target.value)}
-                                  disabled={!hours.enabled}
-                                  className="mt-1"
-                                />
+                              
+                              <div className="flex flex-1 gap-4 items-center">
+                                <div className="flex-1">
+                                  <label htmlFor={`start-${day}`} className="text-sm text-muted-foreground">Start</label>
+                                  <Input
+                                    id={`start-${day}`}
+                                    type="time"
+                                    value={hours.start}
+                                    onChange={(e) => handleWorkHoursChange(day, 'start', e.target.value)}
+                                    disabled={!hours.enabled}
+                                    className="mt-1"
+                                  />
+                                </div>
+                                <div className="flex-1">
+                                  <label htmlFor={`end-${day}`} className="text-sm text-muted-foreground">End</label>
+                                  <Input
+                                    id={`end-${day}`}
+                                    type="time"
+                                    value={hours.end}
+                                    onChange={(e) => handleWorkHoursChange(day, 'end', e.target.value)}
+                                    disabled={!hours.enabled}
+                                    className="mt-1"
+                                  />
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -723,7 +840,11 @@ const Register = () => {
                       className="w-full bg-primary hover:bg-primary-dark text-white" 
                       disabled={loading}
                     >
-                      {loading ? 'Creating Account...' : 'Register as Doctor'}
+                      {loading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        'Register as Doctor'
+                      )}
                     </Button>
                   </div>
                 </form>

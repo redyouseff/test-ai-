@@ -1,4 +1,3 @@
-
 export type UserRole = 'patient' | 'doctor';
 
 export interface User {
@@ -48,15 +47,24 @@ export interface Specialty {
 }
 
 export interface Appointment {
-  id: string;
-  doctorId: string;
-  patientId: string;
-  date: string; // ISO string
-  status: 'scheduled' | 'completed' | 'cancelled';
+  _id: string;
+  doctor: {
+    _id: string;
+    fullName?: string;
+    name?: string;
+  };
+  patient: {
+    _id: string;
+    fullName?: string;
+    name?: string;
+  };
+  appointmentDate: string;
+  reasonForVisit: string;
   notes?: string;
-  requiredFiles?: string[];
-  specialty: string;
-  reason?: string;
+  status: 'pending' | 'completed' | 'cancelled';
+  uploadedFiles: string[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface DiagnosticFile {

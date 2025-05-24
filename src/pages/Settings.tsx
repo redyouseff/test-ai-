@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { useToast } from '@/hooks/use-toast';
 import DashboardLayout from '../components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,16 +9,109 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { RootState } from '../redux/types';
+import axios from 'axios';
+import { AppDispatch } from '../redux/store';
+import { useNavigate } from 'react-router-dom';
+import { logout } from '../redux/actions/authActions';
 
 const Settings = () => {
+  const dispatch = useDispatch<AppDispatch>();
   const { user: currentUser } = useSelector((state: RootState) => state.auth);
   const { toast } = useToast();
+  const navigate = useNavigate();
   
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [smsNotifications, setSmsNotifications] = useState(true);
   const [appointmentReminders, setAppointmentReminders] = useState(true);
   const [resultNotifications, setResultNotifications] = useState(true);
   
+  const [formData, setFormData] = useState({
+    name: currentUser?.name || '',
+    email: currentUser?.email || '',
+    phone: currentUser?.phone || '',
+    fullName: currentUser?.fullName || '',
+  });
+  
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Update password state to match API requirements
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    password: '',
+    passwordConfirm: '',
+  });
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { id, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [id]: value
+    }));
+  };
+
+  const handlePasswordInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { id, value } = e.target;
+    setPasswordData(prev => ({
+      ...prev,
+      [id]: value
+    }));
+  };
+
+  const handleSaveChanges = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await axios.patch(
+        'https://care-insight-api-9ed25d3ea3ea.herokuapp.com/api/v1/users/me',
+        {
+          fullName: formData.fullName || formData.name,
+          phoneNumber: formData.phone,
+          email: formData.email,
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (response.status === 200) {
+        // Update the user in Redux store
+        dispatch({
+          type: 'UPDATE_PROFILE',
+          payload: response.data.data
+        });
+
+        toast({
+          title: "Success",
+          description: "Your account information has been updated successfully.",
+          variant: "default",
+          className: "bg-green-500 text-white border-none"
+        });
+      }
+    } catch (error) {
+      let errorMessage = "Failed to update account information.";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSaveNotifications = () => {
     toast({
       title: "Notification Settings Updated",
@@ -26,12 +119,89 @@ const Settings = () => {
     });
   };
 
-  const handleChangePassword = (e: React.FormEvent) => {
+  const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast({
-      title: "Password Changed",
-      description: "Your password has been updated successfully.",
-    });
+    
+    // Validate passwords match
+    if (passwordData.password !== passwordData.passwordConfirm) {
+      toast({
+        title: "Error",
+        description: "New passwords do not match.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate password length
+    if (passwordData.password.length < 6) {
+      toast({
+        title: "Error",
+        description: "Password must be at least 6 characters long.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsChangingPassword(true);
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await axios.patch(
+        'https://care-insight-api-9ed25d3ea3ea.herokuapp.com/api/v1/users/changePassword',
+        {
+          currentPassword: passwordData.currentPassword,
+          password: passwordData.password,
+          passwordConfirm: passwordData.passwordConfirm
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (response.status === 200) {
+        toast({
+          title: "Success",
+          description: "Password changed successfully. Please log in with your new password.",
+          variant: "default",
+          className: "bg-green-500 text-white border-none"
+        });
+
+        // Clear form
+        setPasswordData({
+          currentPassword: '',
+          password: '',
+          passwordConfirm: '',
+        });
+
+        // Logout and redirect to login page
+        setTimeout(() => {
+          dispatch(logout());
+          navigate('/login');
+        }, 2000);
+      }
+    } catch (error) {
+      let errorMessage = "Failed to change password.";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      if (axios.isAxiosError(error) && error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsChangingPassword(false);
+    }
   };
 
   return (
@@ -55,13 +225,15 @@ const Settings = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <form className="space-y-4">
+                <form onSubmit={handleSaveChanges} className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="name">Name</Label>
+                      <Label htmlFor="fullName">Full Name</Label>
                       <Input
-                        id="name"
-                        defaultValue={currentUser?.name}
+                        id="fullName"
+                        value={formData.fullName || formData.name}
+                        onChange={handleInputChange}
+                        required
                       />
                     </div>
                     <div className="space-y-2">
@@ -69,26 +241,28 @@ const Settings = () => {
                       <Input
                         id="email"
                         type="email"
-                        defaultValue={currentUser?.email}
+                        value={formData.email}
+                        onChange={handleInputChange}
+                        required
                       />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="phone">Phone</Label>
                       <Input
                         id="phone"
-                        defaultValue={currentUser?.phone}
+                        value={formData.phone}
+                        onChange={handleInputChange}
+                        required
                       />
                     </div>
                   </div>
                   <div className="flex justify-end">
                     <Button 
+                      type="submit"
                       className="bg-primary hover:bg-primary-dark text-white"
-                      onClick={() => toast({
-                        title: "Account Updated",
-                        description: "Your account information has been updated.",
-                      })}
+                      disabled={isLoading}
                     >
-                      Save Changes
+                      {isLoading ? 'Saving...' : 'Save Changes'}
                     </Button>
                   </div>
                 </form>
@@ -106,27 +280,39 @@ const Settings = () => {
                 <form onSubmit={handleChangePassword} className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="current-password">Current Password</Label>
+                      <Label htmlFor="currentPassword">Current Password</Label>
                       <Input
-                        id="current-password"
+                        id="currentPassword"
                         type="password"
                         placeholder="••••••••"
+                        value={passwordData.currentPassword}
+                        onChange={handlePasswordInputChange}
+                        required
+                        minLength={6}
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="new-password">New Password</Label>
+                      <Label htmlFor="password">New Password</Label>
                       <Input
-                        id="new-password"
+                        id="password"
                         type="password"
                         placeholder="••••••••"
+                        value={passwordData.password}
+                        onChange={handlePasswordInputChange}
+                        required
+                        minLength={6}
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="confirm-password">Confirm New Password</Label>
+                      <Label htmlFor="passwordConfirm">Confirm New Password</Label>
                       <Input
-                        id="confirm-password"
+                        id="passwordConfirm"
                         type="password"
                         placeholder="••••••••"
+                        value={passwordData.passwordConfirm}
+                        onChange={handlePasswordInputChange}
+                        required
+                        minLength={6}
                       />
                     </div>
                   </div>
@@ -134,8 +320,9 @@ const Settings = () => {
                     <Button 
                       type="submit"
                       className="bg-primary hover:bg-primary-dark text-white"
+                      disabled={isChangingPassword}
                     >
-                      Change Password
+                      {isChangingPassword ? 'Changing Password...' : 'Change Password'}
                     </Button>
                   </div>
                 </form>

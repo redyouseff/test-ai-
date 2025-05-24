@@ -1,16 +1,23 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../redux/types';
 import { fetchProfile } from '../redux/actions/authActions';
+import { AppDispatch } from '../redux/store';
+import axios, { AxiosError } from 'axios';
+import { AnyAction } from 'redux';
+import { useToast } from '@/hooks/use-toast';
+import { FileText, User as UserIcon, Star, StarHalf, Download, File, FileImage, Trash2, Calendar } from 'lucide-react';
+import { format } from 'date-fns';
+
+// Components imports
 import DashboardLayout from '../components/layout/DashboardLayout';
-import { PatientProfile, DoctorProfile } from '../types';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { AppDispatch } from '../redux/store';
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -18,24 +25,42 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useToast } from '@/hooks/use-toast';
-import { FileText, User as UserIcon, Star, StarHalf } from 'lucide-react';
-import axios from 'axios';
-import { Badge } from "@/components/ui/badge";
 
+// Types
 interface WorkingHour {
   day: string;
   from: string;
   to: string;
 }
 
-// Update ExtendedUser interface to include all required fields
+interface ErrorResponse {
+  message: string;
+  data: {
+    message?: string;
+    [key: string]: unknown;
+  };
+}
+
 interface ExtendedUser {
   _id: string;
+  name: string;
   fullName: string;
   email: string;
+  phone: string;
   phoneNumber: string;
   gender: string;
+  role: string;
+  workPlace?: string;
+  experience?: number;
+  bio?: string;
+  age?: number;
+  maritalStatus?: string;
+  profession?: string;
+  height?: number;
+  weight?: number;
+  bloodType?: string;
+  medicalCondition?: string;
+  medications?: string[];
   chronicDiseases: string[];
   currentMedications: string[];
   specialty: string;
@@ -43,7 +68,6 @@ interface ExtendedUser {
   certifications: string[];
   workingHours: WorkingHour[];
   availability: string[];
-  role: string;
   medicalDocuments: string[];
   averageRating?: number;
   numberOfReviews?: number;
@@ -52,36 +76,118 @@ interface ExtendedUser {
   YearsOfExperience?: number;
 }
 
+// Add new interface for review
+interface ReviewFormData {
+  rating: number;
+  comment: string;
+}
+
 const Profile = () => {
   const dispatch = useDispatch<AppDispatch>();
-  const { user, loading, error } = useSelector((state: RootState) => state.auth) as { user: ExtendedUser | null, loading: boolean, error: string | null };
+  const authState = useSelector((state: RootState) => state.auth);
+  const user = authState.user as unknown as ExtendedUser | null;
+  const { loading, error } = authState;
   const { toast } = useToast();
   
+  // State declarations
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingHours, setIsEditingHours] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [editedData, setEditedData] = useState<Partial<ExtendedUser>>({});
   const [editedHours, setEditedHours] = useState<WorkingHour[]>([]);
   const [newCertification, setNewCertification] = useState('');
+  const [medicalDocuments, setMedicalDocuments] = useState<Array<{
+    _id: string;
+    fileName: string;
+    fileUrl: string;
+    uploadDate: string;
+  }>>([]);
+  const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [newDisease, setNewDisease] = useState('');
+  const [newMedication, setNewMedication] = useState('');
+
+  // Add new state for review
+  const [reviewFormData, setReviewFormData] = useState<ReviewFormData>({
+    rating: 5,
+    comment: ''
+  });
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [selectedRating, setSelectedRating] = useState(5);
+
+  // Computed values
+  const isDoctor = user?.role === 'doctor';
+
+  const fetchMedicalDocuments = async () => {
+    try {
+      setIsLoadingDocuments(true);
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await axios.get<{ data: typeof medicalDocuments }>(
+        'https://care-insight-api-9ed25d3ea3ea.herokuapp.com/api/v1/users/getMedicalDocuments',
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      if (response.data?.data) {
+        setMedicalDocuments(response.data.data);
+      }
+    } catch (error: unknown) {
+      let errorMessage = "Failed to fetch medical documents.";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingDocuments(false);
+    }
+  };
 
   useEffect(() => {
-    dispatch(fetchProfile() as any);
+    dispatch(fetchProfile() as unknown as AnyAction);
   }, [dispatch]);
 
   useEffect(() => {
     if (user) {
-      setEditedData({
-        fullName: user.fullName,
-        email: user.email,
-        phoneNumber: user.phoneNumber,
-        clinicLocation: user.clinicLocation,
-        specialty: user.specialty,
-        certifications: user.certifications,
-        workingHours: user.workingHours,
-      });
-      setEditedHours(user.workingHours || []);
+      if (isDoctor) {
+        setEditedData({
+          fullName: user.fullName,
+          email: user.email,
+          phoneNumber: user.phoneNumber,
+          clinicLocation: user.clinicLocation,
+          specialty: user.specialty,
+          certifications: user.certifications,
+          workingHours: user.workingHours,
+        });
+        // Only initialize working hours for doctors
+        const initialHours = [
+          'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
+        ].map(day => {
+          const existingSchedule = user.workingHours?.find(h => h.day === day);
+          return existingSchedule || { day, from: '', to: '' };
+        });
+        setEditedHours(initialHours);
+      } else {
+        // For non-doctors, initialize with basic info only
+        setEditedData({
+          fullName: user.fullName,
+          email: user.email,
+          phoneNumber: user.phoneNumber,
+        });
+      }
+      fetchMedicalDocuments();
     }
-  }, [user]);
+  }, [user, isDoctor]);
 
   const handleInputChange = (name: string, value: string | string[] | number) => {
     setEditedData(prev => ({
@@ -286,7 +392,7 @@ const Profile = () => {
         }
       );
 
-      if (response.status === 200 ) {
+      if (response.status === 200) {
         dispatch({
           type: 'UPDATE_PROFILE',
           payload: {
@@ -296,25 +402,25 @@ const Profile = () => {
         });
 
         toast({
-          title: "تم بنجاح",
-          description: "تم تحديث صورة الملف الشخصي بنجاح",
+          title: "Success",
+          description: "Profile image updated successfully",
         });
 
-        // إعادة تحميل الصفحة بعد نجاح التحميل
         window.location.reload();
       } else {
         throw new Error('Invalid response format from server');
       }
-    } catch (error: any) {
-      let errorMessage = "فشل في تحميل الصورة. يرجى المحاولة مرة أخرى.";
-      if (error.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      } else if (error.message) {
+    } catch (error: unknown) {
+      let errorMessage = "Failed to upload image. Please try again.";
+      
+      if (error instanceof AxiosError && error.response?.data) {
+        errorMessage = error.response.data.message || errorMessage;
+      } else if (error instanceof Error) {
         errorMessage = error.message;
       }
 
       toast({
-        title: "خطأ",
+        title: "Error",
         description: errorMessage,
         variant: "destructive",
       });
@@ -348,18 +454,13 @@ const Profile = () => {
     return `${hour.toString().padStart(2, '0')}:${minutes}`;
   };
 
-  const handleHoursChange = (index: number, field: keyof WorkingHour, value: string) => {
+  const handleHoursChange = (dayIndex: number, field: 'from' | 'to', value: string) => {
     setEditedHours(prev => {
       const newHours = [...prev];
-      if (field === 'from' || field === 'to') {
-        // For time fields, store in 24h format
-        newHours[index] = { 
-          ...newHours[index], 
-          [field]: value ? formatTime(value) : ''
-        };
-      } else {
-        newHours[index] = { ...newHours[index], [field]: value };
-      }
+      newHours[dayIndex] = {
+        ...newHours[dayIndex],
+        [field]: value
+      };
       return newHours;
     });
   };
@@ -371,16 +472,12 @@ const Profile = () => {
         throw new Error('No authentication token found');
       }
 
-      // Format the working hours for the API
-      const formattedHours = editedHours.map(hour => ({
-        day: hour.day,
-        from: parseTime(hour.from),
-        to: parseTime(hour.to)
-      }));
+      // Filter out days with empty schedules
+      const validHours = editedHours.filter(hour => hour.from && hour.to);
 
       const response = await axios.patch(
         'https://care-insight-api-9ed25d3ea3ea.herokuapp.com/api/v1/users/updateWorkingHours',
-        { workingHours: formattedHours },
+        { workingHours: validHours },
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -394,352 +491,472 @@ const Profile = () => {
           title: "Success",
           description: "Working hours have been updated successfully.",
           variant: "default",
+          className: "bg-green-500 text-white border-none"
         });
         setIsEditingHours(false);
         
-        // Update the local state with the new working hours
+        // Update local state with the response data
         if (response.data?.data?.workingHours) {
-          setEditedHours(response.data.data.workingHours);
+          const updatedHours = [
+            'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
+          ].map(day => {
+            const existingSchedule = response.data.data.workingHours.find((h: WorkingHour) => h.day === day);
+            return existingSchedule || { day, from: '', to: '' };
+          });
+          setEditedHours(updatedHours);
+          
+          // Update the user state in Redux
+          dispatch({
+            type: 'UPDATE_PROFILE',
+            payload: {
+              ...user,
+              workingHours: response.data.data.workingHours
+            }
+          });
         }
       }
-    } catch (error: unknown) {
-      let errorMessage = "Failed to update working hours.";
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      }
+    } catch (error) {
+      console.error('Error updating working hours:', error);
       toast({
         title: "Error",
-        description: errorMessage,
-        variant: "destructive",
+        description: "Failed to update working hours. Please try again.",
+        variant: "destructive"
       });
     }
   };
 
+  const handleDeleteHours = (dayIndex: number) => {
+    setEditedHours(prev => {
+      const newHours = [...prev];
+      newHours[dayIndex] = {
+        ...newHours[dayIndex],
+        from: '',
+        to: ''
+      };
+      return newHours;
+    });
+  };
+
   const renderPatientProfile = () => {
     if (!user || user.role !== 'patient') return null;
-    const patient = user as PatientProfile;
     
     return (
-      <div className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Personal Information</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isEditing ? (
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Full Name</Label>
-                    <Input
-                      id="name"
-                      name="name"
-                      value={patient?.name || ''}
-                      onChange={handleChange}
-                    />
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* Left Side - Profile Photo */}
+        <div className="w-full lg:w-[300px]">
+          <div className="bg-white rounded-lg border border-gray-100 p-6">
+            <div className="flex flex-col items-center text-center">
+              <div className="w-32 h-32 rounded-full bg-gray-50 flex items-center justify-center mb-4 border-4 border-gray-50 relative group">
+                {user.profileImage ? (
+                  <img 
+                    src={user.profileImage} 
+                    alt={user.fullName} 
+                    className="w-full h-full rounded-full object-cover" 
+                  />
+                ) : (
+                  <div className="w-full h-full rounded-full bg-gray-50 flex items-center justify-center">
+                    <UserIcon size={48} className="text-gray-300" />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      name="email"
-                      type="email"
-                      value={patient?.email || ''}
-                      onChange={handleChange}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Phone</Label>
-                    <Input
-                      id="phone"
-                      name="phone"
-                      value={patient?.phone || ''}
-                      onChange={handleChange}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="age">Age</Label>
-                    <Input
-                      id="age"
-                      name="age"
-                      type="number"
-                      value={patient?.age || ''}
-                      onChange={handleChange}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="gender">Gender</Label>
-                    <Select
-                      value={patient?.gender}
-                      onValueChange={(value) => handleSelectChange('gender', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select gender" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="male">Male</SelectItem>
-                        <SelectItem value="female">Female</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="maritalStatus">Marital Status</Label>
-                    <Select
-                      value={patient?.maritalStatus}
-                      onValueChange={(value) => handleSelectChange('maritalStatus', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="single">Single</SelectItem>
-                        <SelectItem value="married">Married</SelectItem>
-                        <SelectItem value="divorced">Divorced</SelectItem>
-                        <SelectItem value="widowed">Widowed</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="profession">Profession</Label>
-                    <Input
-                      id="profession"
-                      name="profession"
-                      value={patient?.profession || ''}
-                      onChange={handleChange}
-                    />
-                  </div>
-                </div>
-
-                <div className="pt-4 flex justify-end space-x-4">
-                  <Button 
-                    type="button" 
-                    variant="outline"
-                    onClick={() => {
-                      setIsEditing(false);
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button 
-                    type="submit"
-                    className="bg-primary hover:bg-primary-dark text-white"
-                  >
-                    Save Changes
-                  </Button>
-                </div>
-              </form>
-            ) : (
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-500">Full Name</p>
-                    <p className="font-medium">{patient?.name}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Email</p>
-                    <p className="font-medium">{patient?.email}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Phone</p>
-                    <p className="font-medium">{patient?.phone}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Age</p>
-                    <p className="font-medium">{patient?.age}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Gender</p>
-                    <p className="font-medium capitalize">{patient?.gender}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Marital Status</p>
-                    <p className="font-medium capitalize">{patient?.maritalStatus}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Profession</p>
-                    <p className="font-medium">{patient?.profession}</p>
-                  </div>
-                </div>
-
-                <div className="pt-4">
-                  <Button 
-                    className="bg-primary hover:bg-primary-dark text-white"
-                    onClick={() => setIsEditing(true)}
-                  >
-                    Edit Information
-                  </Button>
-                </div>
+                )}
               </div>
-            )}
-          </CardContent>
-        </Card>
+              <h2 className="text-xl font-semibold text-gray-900 mb-1">{user.fullName}</h2>
+              <p className="text-gray-500 mb-4 capitalize">{user.role}</p>
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => document.getElementById('profile-image')?.click()}
+              >
+                Change Photo
+              </Button>
+              <input
+                type="file"
+                id="profile-image"
+                className="hidden"
+                accept="image/*"
+                onChange={handleImageUpload}
+              />
+            </div>
+          </div>
+        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Medical Information</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isEditing ? (
-              <form className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="height">Height (cm)</Label>
-                    <Input
-                      id="height"
-                      name="height"
-                      type="number"
-                      value={patient?.height || ''}
-                      onChange={handleChange}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="weight">Weight (kg)</Label>
-                    <Input
-                      id="weight"
-                      name="weight"
-                      type="number"
-                      value={patient?.weight || ''}
-                      onChange={handleChange}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="bloodType">Blood Type</Label>
-                    <Select
-                      value={patient?.bloodType}
-                      onValueChange={(value) => handleSelectChange('bloodType', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select blood type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="A+">A+</SelectItem>
-                        <SelectItem value="A-">A-</SelectItem>
-                        <SelectItem value="B+">B+</SelectItem>
-                        <SelectItem value="B-">B-</SelectItem>
-                        <SelectItem value="AB+">AB+</SelectItem>
-                        <SelectItem value="AB-">AB-</SelectItem>
-                        <SelectItem value="O+">O+</SelectItem>
-                        <SelectItem value="O-">O-</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
+        {/* Right Side - Profile Information */}
+        <div className="flex-1">
+          <Tabs defaultValue="profile" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 bg-gray-50/80 p-1 rounded-lg mb-6">
+              <TabsTrigger 
+                value="profile"
+                className="rounded-md py-3 text-sm font-medium data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm"
+              >
+                Profile
+              </TabsTrigger>
+              <TabsTrigger 
+                value="documents"
+                className="rounded-md py-3 text-sm font-medium data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm"
+              >
+                Medical Documents
+              </TabsTrigger>
+            </TabsList>
 
-                <div className="space-y-2">
-                  <Label htmlFor="medicalCondition">Medical Condition</Label>
-                  <Textarea
-                    id="medicalCondition"
-                    name="medicalCondition"
-                    value={patient?.medicalCondition || ''}
-                    onChange={handleChange}
-                    rows={4}
-                    placeholder="Describe your current medical condition..."
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="chronicDiseases">Chronic Diseases</Label>
-                  <Textarea
-                    id="chronicDiseases"
-                    name="chronicDiseases"
-                    value={patient?.chronicDiseases?.join(', ') || ''}
-                    onChange={(e) => {
-                      const diseases = e.target.value.split(',').map(disease => disease.trim());
-                      if (user && user.role === 'patient') {
-                        dispatch({
-                          type: 'UPDATE_PROFILE',
-                          payload: {
-                            ...user,
-                            chronicDiseases: diseases
-                          }
-                        });
-                      }
-                    }}
-                    placeholder="Enter any chronic diseases, separated by commas..."
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="medications">Current Medications</Label>
-                  <Textarea
-                    id="medications"
-                    name="medications"
-                    value={patient?.medications?.join(', ') || ''}
-                    onChange={(e) => {
-                      const medications = e.target.value.split(',').map(med => med.trim());
-                      if (user && user.role === 'patient') {
-                        dispatch({
-                          type: 'UPDATE_PROFILE',
-                          payload: {
-                            ...user,
-                            medications
-                          }
-                        });
-                      }
-                    }}
-                    placeholder="Enter any medications you are currently taking, separated by commas..."
-                  />
-                </div>
-              </form>
-            ) : (
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-500">Height</p>
-                    <p className="font-medium">{patient?.height} cm</p>
+            <TabsContent value="profile">
+              <div className="space-y-6">
+                {/* Personal Information Card */}
+                <div className="bg-white rounded-lg border border-gray-100 p-6">
+                  <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-xl font-semibold text-gray-900">Personal Information</h2>
+                    {!isEditing && (
+                      <Button 
+                        variant="secondary"
+                        className="bg-primary/10 hover:bg-primary/20 text-primary"
+                        onClick={() => setIsEditing(true)}
+                      >
+                        Edit Information
+                      </Button>
+                    )}
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Weight</p>
-                    <p className="font-medium">{patient?.weight} kg</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Blood Type</p>
-                    <p className="font-medium">{patient?.bloodType}</p>
-                  </div>
-                </div>
 
-                <div>
-                  <p className="text-sm text-gray-500">Medical Condition</p>
-                  <p className="text-gray-700">{patient?.medicalCondition || 'No information provided.'}</p>
-                </div>
+                  {isEditing ? (
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                        <div>
+                          <Label className="text-sm text-gray-500">Full Name</Label>
+                          <Input
+                            value={editedData.fullName || ''}
+                            onChange={(e) => handleInputChange('fullName', e.target.value)}
+                            className="mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm text-gray-500">Email</Label>
+                          <Input
+                            type="email"
+                            value={editedData.email || ''}
+                            onChange={(e) => handleInputChange('email', e.target.value)}
+                            className="mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm text-gray-500">Phone</Label>
+                          <Input
+                            value={editedData.phoneNumber || ''}
+                            onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
+                            className="mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm text-gray-500">Age</Label>
+                          <Input
+                            type="number"
+                            value={editedData.age || ''}
+                            onChange={(e) => handleInputChange('age', parseInt(e.target.value))}
+                            className="mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm text-gray-500">Gender</Label>
+                          <Select
+                            value={editedData.gender}
+                            onValueChange={(value) => handleInputChange('gender', value)}
+                          >
+                            <SelectTrigger className="mt-1">
+                              <SelectValue placeholder="Select gender" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="male">Male</SelectItem>
+                              <SelectItem value="female">Female</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
 
-                <div>
-                  <p className="text-sm text-gray-500">Chronic Diseases</p>
-                  {patient?.chronicDiseases && patient.chronicDiseases.length > 0 ? (
-                    <ul className="list-disc pl-5 text-gray-700">
-                      {patient.chronicDiseases.map((disease, index) => (
-                        <li key={index}>{disease}</li>
-                      ))}
-                    </ul>
+                      <div className="flex justify-end gap-4 mt-6">
+                        <Button 
+                          type="button" 
+                          variant="outline"
+                          onClick={() => setIsEditing(false)}
+                        >
+                          Cancel
+                        </Button>
+                        <Button 
+                          type="submit"
+                          className="bg-primary text-white"
+                        >
+                          Save Changes
+                        </Button>
+                      </div>
+                    </form>
                   ) : (
-                    <p className="text-gray-700">None reported</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                      <div>
+                        <p className="text-sm text-gray-500">Full Name</p>
+                        <p className="mt-1 font-medium">{user.fullName}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500">Email</p>
+                        <p className="mt-1 font-medium">{user.email}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500">Phone</p>
+                        <p className="mt-1 font-medium">{user.phoneNumber}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500">Age</p>
+                        <p className="mt-1 font-medium">{user.age} years</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500">Gender</p>
+                        <p className="mt-1 font-medium capitalize">{user.gender}</p>
+                      </div>
+                    </div>
                   )}
                 </div>
 
-                <div>
-                  <p className="text-sm text-gray-500">Current Medications</p>
-                  {patient?.medications && patient.medications.length > 0 ? (
-                    <ul className="list-disc pl-5 text-gray-700">
-                      {patient.medications.map((medication, index) => (
-                        <li key={index}>{medication}</li>
-                      ))}
-                    </ul>
+                {/* Medical Information Card */}
+                <div className="bg-white rounded-lg border border-gray-100 p-6">
+                  <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-xl font-semibold text-gray-900">Medical Information</h2>
+                    {!isEditing && (
+                      <Button 
+                        variant="secondary"
+                        className="bg-primary/10 hover:bg-primary/20 text-primary"
+                        onClick={() => setIsEditing(true)}
+                      >
+                        Edit Information
+                      </Button>
+                    )}
+                  </div>
+
+                  {isEditing ? (
+                    <form className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                          <Label className="text-sm text-gray-500">Height (cm)</Label>
+                          <Input
+                            type="number"
+                            value={editedData.height || ''}
+                            onChange={(e) => handleInputChange('height', parseInt(e.target.value))}
+                            className="mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm text-gray-500">Weight (kg)</Label>
+                          <Input
+                            type="number"
+                            value={editedData.weight || ''}
+                            onChange={(e) => handleInputChange('weight', parseInt(e.target.value))}
+                            className="mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-sm text-gray-500">Blood Type</Label>
+                          <Select
+                            value={editedData.bloodType}
+                            onValueChange={(value) => handleInputChange('bloodType', value)}
+                          >
+                            <SelectTrigger className="mt-1">
+                              <SelectValue placeholder="Select blood type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="A+">A+</SelectItem>
+                              <SelectItem value="A-">A-</SelectItem>
+                              <SelectItem value="B+">B+</SelectItem>
+                              <SelectItem value="B-">B-</SelectItem>
+                              <SelectItem value="AB+">AB+</SelectItem>
+                              <SelectItem value="AB-">AB-</SelectItem>
+                              <SelectItem value="O+">O+</SelectItem>
+                              <SelectItem value="O-">O-</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label className="text-sm text-gray-500">Medical Condition</Label>
+                        <Textarea
+                          value={editedData.medicalCondition || ''}
+                          onChange={(e) => handleInputChange('medicalCondition', e.target.value)}
+                          className="mt-1"
+                          rows={4}
+                        />
+                      </div>
+
+                      <div>
+                        <Label className="text-sm text-gray-500">Chronic Diseases</Label>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {editedData.chronicDiseases?.map((disease, index) => (
+                            <Badge key={index} variant="secondary" className="px-3 py-1">
+                              {disease}
+                              <button
+                                type="button"
+                                className="ml-2 text-red-500 hover:text-red-700"
+                                onClick={() => {
+                                  const newDiseases = editedData.chronicDiseases?.filter((_, i) => i !== index) || [];
+                                  handleInputChange('chronicDiseases', newDiseases);
+                                }}
+                              >
+                                ×
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                        <div className="flex gap-2 mt-2">
+                          <Input
+                            placeholder="Add chronic disease"
+                            value={newDisease}
+                            onChange={(e) => setNewDisease(e.target.value)}
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                if (newDisease.trim()) {
+                                  handleInputChange('chronicDiseases', [...(editedData.chronicDiseases || []), newDisease.trim()]);
+                                  setNewDisease('');
+                                }
+                              }
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            onClick={() => {
+                              if (newDisease.trim()) {
+                                handleInputChange('chronicDiseases', [...(editedData.chronicDiseases || []), newDisease.trim()]);
+                                setNewDisease('');
+                              }
+                            }}
+                          >
+                            Add
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label className="text-sm text-gray-500">Current Medications</Label>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {editedData.currentMedications?.map((medication, index) => (
+                            <Badge key={index} variant="secondary" className="px-3 py-1">
+                              {medication}
+                              <button
+                                type="button"
+                                className="ml-2 text-red-500 hover:text-red-700"
+                                onClick={() => {
+                                  const newMedications = editedData.currentMedications?.filter((_, i) => i !== index) || [];
+                                  handleInputChange('currentMedications', newMedications);
+                                }}
+                              >
+                                ×
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                        <div className="flex gap-2 mt-2">
+                          <Input
+                            placeholder="Add medication"
+                            value={newMedication}
+                            onChange={(e) => setNewMedication(e.target.value)}
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                if (newMedication.trim()) {
+                                  handleInputChange('currentMedications', [...(editedData.currentMedications || []), newMedication.trim()]);
+                                  setNewMedication('');
+                                }
+                              }
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            onClick={() => {
+                              if (newMedication.trim()) {
+                                handleInputChange('currentMedications', [...(editedData.currentMedications || []), newMedication.trim()]);
+                                setNewMedication('');
+                              }
+                            }}
+                          >
+                            Add
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end gap-4 mt-6">
+                        <Button 
+                          type="button" 
+                          variant="outline"
+                          onClick={() => setIsEditing(false)}
+                        >
+                          Cancel
+                        </Button>
+                        <Button 
+                          type="submit"
+                          className="bg-primary text-white"
+                        >
+                          Save Changes
+                        </Button>
+                      </div>
+                    </form>
                   ) : (
-                    <p className="text-gray-700">None reported</p>
+                    <div className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                          <p className="text-sm text-gray-500">Height</p>
+                          <p className="mt-1 font-medium">{user.height} cm</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500">Weight</p>
+                          <p className="mt-1 font-medium">{user.weight} kg</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500">Blood Type</p>
+                          <p className="mt-1 font-medium">{user.bloodType}</p>
+                        </div>
+                      </div>
+
+                      <div>
+                        <p className="text-sm text-gray-500">Medical Condition</p>
+                        <p className="mt-1">{user.medicalCondition || 'No information provided'}</p>
+                      </div>
+
+                      <div>
+                        <p className="text-sm text-gray-500">Chronic Diseases</p>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {user.chronicDiseases?.map((disease, index) => (
+                            <Badge key={index} variant="secondary">
+                              {disease}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <p className="text-sm text-gray-500">Current Medications</p>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {user.currentMedications?.map((medication, index) => (
+                            <Badge key={index} variant="secondary">
+                              {medication}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </TabsContent>
+
+            <TabsContent value="documents">
+              {/* Medical Documents content remains the same */}
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
     );
   };
 
   const renderDoctorProfile = () => {
     if (!user || user.role !== 'doctor') return null;
-    const doctor = user as any;
+    const doctor = user as ExtendedUser;
+    
+    // Get the doctor ID from the URL to check if we're viewing another doctor's profile
+    const pathSegments = window.location.pathname.split('/');
+    const currentDoctorId = pathSegments[pathSegments.length - 1];
+    const isOwnProfile = user._id === currentDoctorId;
     
     return (
       <div className="space-y-6">
@@ -763,7 +980,7 @@ const Profile = () => {
               </div>
               <div>
                 <p className="text-sm text-gray-500">Work Place</p>
-                <p className="text-base mt-1">{doctor.workPlace || doctor.clinicLocation}</p>
+                <p className="text-base mt-1">{doctor.clinicLocation || doctor.workPlace}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-500">Specialty</p>
@@ -771,11 +988,11 @@ const Profile = () => {
               </div>
               <div>
                 <p className="text-sm text-gray-500">Years of Experience</p>
-                <p className="text-base mt-1">{doctor.experience} years</p>
+                <p className="text-base mt-1">{doctor.YearsOfExperience || doctor.experience} years</p>
               </div>
               <div className="col-span-2">
                 <p className="text-sm text-gray-500">Professional Bio</p>
-                <p className="text-base mt-1">{doctor.bio || `Dr. ${doctor.name} is a leading neurologist specializing in brain cancer treatment with ${doctor.experience} years of experience.`}</p>
+                <p className="text-base mt-1">{doctor.ProfessionalBio || doctor.bio || `Dr. ${doctor.fullName} is a leading specialist with ${doctor.YearsOfExperience || doctor.experience} years of experience.`}</p>
               </div>
               <div className="col-span-2">
                 <p className="text-sm text-gray-500">Certifications</p>
@@ -820,6 +1037,63 @@ const Profile = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Only show review form if viewing another doctor's profile */}
+        {!isOwnProfile && (
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle>Leave a Review</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form 
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleReviewSubmit(e);
+                }}
+                className="space-y-4"
+              >
+                <div className="space-y-2">
+                  <Label>Your Rating</Label>
+                  <div className="flex items-center gap-1">
+                    {renderRatingStars(true)}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Your Review</Label>
+                  <Textarea
+                    value={reviewFormData.comment}
+                    onChange={(e) => {
+                      console.log('Comment changed:', e.target.value);
+                      setReviewFormData(prev => ({
+                        ...prev,
+                        comment: e.target.value
+                      }));
+                    }}
+                    placeholder="Write your review here..."
+                    className="min-h-[100px]"
+                    required
+                  />
+                </div>
+
+                <Button
+                  type="submit"
+                  className="bg-primary text-white w-full"
+                  disabled={isSubmittingReview || !reviewFormData.comment.trim()}
+                >
+                  {isSubmittingReview ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Submitting...</span>
+                    </div>
+                  ) : (
+                    'Submit Review'
+                  )}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        )}
       </div>
     );
   };
@@ -881,6 +1155,240 @@ const Profile = () => {
       )}
     </div>
   );
+
+  const handleDocumentUpload = async (file: File) => {
+    try {
+      setIsUploading(true);
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const formData = new FormData();
+      formData.append('medicalDocuments', file);
+
+      const response = await axios.post(
+        'https://care-insight-api-9ed25d3ea3ea.herokuapp.com/api/v1/users/uploadMedicalDocuments',
+        formData,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data'
+          }
+        }
+      );
+
+      if (response.status === 200) {
+        toast({
+          title: "Success",
+          description: "Document uploaded successfully.",
+          variant: "default",
+          className: "bg-green-500 text-white border-none"
+        });
+        fetchMedicalDocuments();
+      }
+    } catch (error: unknown) {
+      let errorMessage = "Failed to upload document.";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Add handleBrowseClick function
+  const handleBrowseClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  // Add helper function to get file icon
+  const getFileIcon = (fileName: string) => {
+    const extension = fileName.split('.').pop()?.toLowerCase();
+    switch (extension) {
+      case 'pdf':
+        return <FileText className="w-10 h-10 text-red-500" />;
+      case 'doc':
+      case 'docx':
+        return <File className="w-10 h-10 text-blue-500" />;
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+        return <FileImage className="w-10 h-10 text-green-500" />;
+      default:
+        return <FileText className="w-10 h-10 text-gray-400" />;
+    }
+  };
+
+  // Add a helper function to safely format dates
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        return 'Invalid date';
+      }
+      return format(date, 'MMM dd, yyyy');
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Invalid date';
+    }
+  };
+
+  // Add delete handler function
+  const handleDeleteDocument = async (documentId: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await axios.delete(
+        `https://care-insight-api-9ed25d3ea3ea.herokuapp.com/api/v1/users/deleteMedicalDocument/${documentId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      if (response.status === 200) {
+        toast({
+          title: "Success",
+          description: "Document deleted successfully.",
+          variant: "default",
+          className: "bg-green-500 text-white border-none"
+        });
+        // Refresh the documents list
+        fetchMedicalDocuments();
+      }
+    } catch (error) {
+      let errorMessage = "Failed to delete document.";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Modify the handleReviewSubmit function
+  const handleReviewSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    console.log('Form submitted'); // Debug log
+    
+    if (!reviewFormData.comment.trim()) {
+      toast({
+        title: "Error",
+        description: "Please write a review comment",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsSubmittingReview(true);
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      // Get the doctor ID from the URL
+      const pathSegments = window.location.pathname.split('/');
+      const doctorId = pathSegments[pathSegments.length - 1];
+
+      console.log('Sending review with data:', {
+        doctorId,
+        rating: selectedRating,
+        comment: reviewFormData.comment
+      });
+
+      const response = await axios.post(
+        'https://care-insight-api-9ed25d3ea3ea.herokuapp.com/api/v1/reviews',
+        {
+          doctorId,
+          rating: selectedRating,
+          comment: reviewFormData.comment
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      console.log('Response:', response);
+
+      if (response.status === 201 || response.status === 200) {
+        toast({
+          title: "Success",
+          description: "Your review has been submitted successfully.",
+          variant: "default",
+          className: "bg-green-500 text-white border-none"
+        });
+        
+        // Reset form
+        setReviewFormData({ rating: 5, comment: '' });
+        setSelectedRating(5);
+        
+        // Refresh profile data to show updated rating
+        dispatch(fetchProfile() as unknown as AnyAction);
+      }
+    } catch (error) {
+      console.error('Error submitting review:', error);
+      let errorMessage = "Failed to submit review. Please try again.";
+      if (error instanceof AxiosError) {
+        errorMessage = error.response?.data?.message || errorMessage;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
+
+  // Add helper function to render rating stars
+  const renderRatingStars = (editable = false) => {
+    return (
+      <div className="flex items-center gap-1">
+        {[1, 2, 3, 4, 5].map((rating) => (
+          <button
+            key={rating}
+            type={editable ? "button" : undefined}
+            className={`${editable ? 'cursor-pointer hover:scale-110 transition-transform' : ''}`}
+            onClick={editable ? () => setSelectedRating(rating) : undefined}
+          >
+            <Star
+              className={`w-6 h-6 ${
+                rating <= (editable ? selectedRating : (user?.averageRating || 0))
+                  ? 'fill-yellow-400 text-yellow-400'
+                  : 'text-gray-300'
+              }`}
+            />
+          </button>
+        ))}
+        {!editable && (
+          <span className="text-sm text-gray-500 ml-2">
+            ({user?.numberOfReviews || 0} {user?.numberOfReviews === 1 ? 'review' : 'reviews'})
+          </span>
+        )}
+      </div>
+    );
+  };
 
   return (
     <DashboardLayout>
@@ -956,7 +1464,9 @@ const Profile = () => {
                   <TabsContent value="profile" className="p-10">
                     <div className="space-y-10">
                       <div>
-                        <h3 className="text-xl font-semibold text-gray-900 mb-8">Professional Information</h3>
+                        <h3 className="text-xl font-semibold text-gray-900 mb-8">
+                          {isDoctor ? 'Professional Information' : 'Personal Information'}
+                        </h3>
                         <div className="grid grid-cols-2 gap-x-16 gap-y-8">
                           {isEditing ? (
                             <>
@@ -1004,37 +1514,37 @@ const Profile = () => {
                             </>
                           ) : (
                             <>
-                              <div>
-                                <p className="text-sm font-medium text-gray-500 mb-2">Full Name</p>
+                          <div>
+                            <p className="text-sm font-medium text-gray-500 mb-2">Full Name</p>
                                 <p className="text-base text-gray-900">{user?.fullName}</p>
-                              </div>
-                              <div>
-                                <p className="text-sm font-medium text-gray-500 mb-2">Email</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-500 mb-2">Email</p>
                                 <p className="text-base text-gray-900">{user?.email}</p>
-                              </div>
-                              <div>
-                                <p className="text-sm font-medium text-gray-500 mb-2">Phone</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-500">Phone</p>
                                 <p className="text-base text-gray-900">{user?.phoneNumber}</p>
-                              </div>
-                              <div>
-                                <p className="text-sm font-medium text-gray-500 mb-2">Work Place</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-500">Work Place</p>
                                 <p className="text-base text-gray-900">{user?.clinicLocation}</p>
-                              </div>
-                              <div>
-                                <p className="text-sm font-medium text-gray-500 mb-2">Specialty</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-500 mb-2">Specialty</p>
                                 <p className="text-base text-gray-900">{user?.specialty || 'Not specified'}</p>
-                              </div>
-                              <div>
+                          </div>
+                          <div>
                                 <p className="text-sm font-medium text-gray-500 mb-2">Rating</p>
                                 <div className="flex items-center gap-2">
                                   <div className="flex">
-                                    {renderStars(user?.averageRating || 0)}
-                                  </div>
+                                    {renderRatingStars(false)}
+                          </div>
                                   <p className="text-base text-gray-900">
                                     ({user?.numberOfReviews || 0} {user?.numberOfReviews === 1 ? 'review' : 'reviews'})
                                   </p>
-                                </div>
-                              </div>
+                          </div>
+                          </div>
                               {renderCertificationsSection()}
                             </>
                           )}
@@ -1043,7 +1553,7 @@ const Profile = () => {
                         <div className="mt-10 flex gap-4">
                           {isEditing ? (
                             <>
-                              <Button 
+                        <Button 
                                 className="bg-primary text-white font-medium px-6"
                                 size="lg"
                                 onClick={handleSaveChanges}
@@ -1075,140 +1585,328 @@ const Profile = () => {
                           ) : (
                             <Button 
                               className="bg-primary/10 hover:bg-primary/20 text-primary font-medium px-6"
-                              variant="ghost"
-                              size="lg"
+                          variant="ghost"
+                          size="lg"
                               onClick={() => setIsEditing(true)}
-                            >
-                              Edit Information
-                            </Button>
+                        >
+                          Edit Information
+                        </Button>
                           )}
                         </div>
                       </div>
 
-                      <div>
-                        <h3 className="text-xl font-semibold text-gray-900 mb-8">Availability</h3>
-                        <div className="flex flex-wrap gap-2">
-                          {user?.availability?.map((day) => (
-                            <Badge 
-                              key={day}
-                              variant="secondary" 
-                              className="bg-primary/10 hover:bg-primary/20 text-primary"
-                            >
-                              {day}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
+                      {/* Only show Availability and Working Hours for doctors */}
+                      {isDoctor && (
+                        <>
+                          <div>
+                            <h3 className="text-xl font-semibold text-gray-900 mb-8">Availability</h3>
+                            <div className="flex flex-wrap gap-2">
+                              {user?.availability?.map((day) => (
+                                <Badge 
+                                  key={day}
+                                  variant="secondary" 
+                                  className="bg-primary/10 hover:bg-primary/20 text-primary"
+                                >
+                                  {day}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
 
+                          <div className="mt-8 bg-white rounded-lg border border-gray-100 p-6">
+                            <div className="flex justify-between items-center mb-6">
+                              <h2 className="text-xl font-semibold text-gray-900">Working Hours</h2>
+                              {!isEditingHours ? (
+                                <Button 
+                                  onClick={() => setIsEditingHours(true)}
+                                  variant="outline"
+                                  className="bg-primary/10 hover:bg-primary/20 text-primary"
+                                >
+                                  Edit Working Hours
+                                </Button>
+                              ) : (
+                                <div className="flex gap-2">
+                                  <Button 
+                                    onClick={handleSaveHours}
+                                    className="bg-primary hover:bg-primary-dark text-white"
+                                  >
+                                    Save Changes
+                                  </Button>
+                                  <Button 
+                                    variant="outline"
+                                    onClick={() => {
+                                      setIsEditingHours(false);
+                                      if (user?.workingHours) {
+                                        const resetHours = [
+                                          'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
+                                        ].map(day => {
+                                          const existingSchedule = user.workingHours.find(h => h.day === day);
+                                          return existingSchedule || { day, from: '', to: '' };
+                                        });
+                                        setEditedHours(resetHours);
+                                      }
+                                    }}
+                                  >
+                                    Cancel
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="space-y-4">
+                              {isEditingHours ? (
+                                <div className="grid gap-4">
+                                  {editedHours.map((schedule, index) => (
+                                    <div key={schedule.day} className="grid grid-cols-12 gap-4 items-center">
+                                      <div className="col-span-3">
+                                        <Label className="font-medium">{schedule.day}</Label>
+                                      </div>
+                                      <div className="col-span-3">
+                                        <Select
+                                          value={schedule.from}
+                                          onValueChange={(value) => handleHoursChange(index, 'from', value)}
+                                        >
+                                          <SelectTrigger>
+                                            <SelectValue placeholder="Start time" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {Array.from({ length: 24 }, (_, i) => {
+                                              const hour = i.toString().padStart(2, '0');
+                                              return (
+                                                <SelectItem key={hour} value={`${hour}:00`}>
+                                                  {`${hour}:00`}
+                                                </SelectItem>
+                                              );
+                                            })}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                      <div className="col-span-1 text-center">to</div>
+                                      <div className="col-span-3">
+                                        <Select
+                                          value={schedule.to}
+                                          onValueChange={(value) => handleHoursChange(index, 'to', value)}
+                                        >
+                                          <SelectTrigger>
+                                            <SelectValue placeholder="End time" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {Array.from({ length: 24 }, (_, i) => {
+                                              const hour = i.toString().padStart(2, '0');
+                                              return (
+                                                <SelectItem key={hour} value={`${hour}:00`}>
+                                                  {`${hour}:00`}
+                                                </SelectItem>
+                                              );
+                                            })}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                      <div className="col-span-2 flex justify-end">
+                                        {(schedule.from || schedule.to) && (
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                            onClick={() => handleDeleteHours(index)}
+                                          >
+                                            <Trash2 className="h-4 w-4" />
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="grid gap-3">
+                                  {editedHours
+                                    .filter(schedule => schedule.from && schedule.to)
+                                    .map((schedule) => (
+                                      <div key={schedule.day} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+                                        <span className="font-medium w-32">{schedule.day}</span>
+                                        <div className="flex gap-2">
+                                          <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm">
+                                            {schedule.from} - {schedule.to}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  {editedHours.filter(schedule => schedule.from && schedule.to).length === 0 && (
+                                    <p className="text-center text-gray-500 py-4">No working hours set</p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </TabsContent>
                   
                   <TabsContent value="documents" className="p-10">
-                    <div className="grid gap-6">
-                      <div className="p-8 border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center bg-gray-50/50">
+                    <div className="space-y-6">
+                      <div 
+                        className="p-8 border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center bg-gray-50/50 relative cursor-pointer"
+                        onClick={handleBrowseClick}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const file = e.dataTransfer.files?.[0];
+                          if (file) {
+                            handleDocumentUpload(file);
+                          }
+                        }}
+                      >
+                        {isUploading && (
+                          <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
+                            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                          </div>
+                        )}
                         <FileText size={40} className="text-gray-400 mb-3" />
                         <p className="font-medium text-gray-900 mb-1">Upload a new document</p>
                         <p className="text-sm text-gray-500 mb-6">Drag and drop files here or click to browse</p>
-                        <input type="file" className="hidden" id="file-upload" />
-                        <label htmlFor="file-upload">
+                        <input 
+                          ref={fileInputRef}
+                          type="file" 
+                          className="hidden" 
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              // Add file type validation
+                              const allowedTypes = [
+                                'application/pdf',
+                                'application/msword',
+                                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                                'image/jpeg',
+                                'image/png'
+                              ];
+                              
+                              if (!allowedTypes.includes(file.type)) {
+                                toast({
+                                  title: "Error",
+                                  description: "Please upload a valid document (PDF, DOC, DOCX, JPG, or PNG).",
+                                  variant: "destructive",
+                                });
+                                return;
+                              }
+
+                              // Add file size validation (5MB max)
+                              if (file.size > 5 * 1024 * 1024) {
+                                toast({
+                                  title: "Error",
+                                  description: "File size should be less than 5MB.",
+                                  variant: "destructive",
+                                });
+                                return;
+                              }
+
+                              handleDocumentUpload(file);
+                            }
+                          }}
+                          accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                        />
                           <Button 
+                          type="button"
                             size="lg"
                             variant="outline"
                             className="font-medium"
+                          disabled={isUploading}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleBrowseClick();
+                          }}
                           >
-                            Browse Files
+                          {isUploading ? 'Uploading...' : 'Browse Files'}
                           </Button>
-                        </label>
                       </div>
 
-                      <div className="text-center py-6">
+                      {isLoadingDocuments ? (
+                        <div className="flex justify-center py-8">
+                          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                      ) : medicalDocuments.length > 0 ? (
+                        <div className="grid gap-4">
+                          {medicalDocuments.map((doc) => (
+                            <div 
+                              key={doc._id} 
+                              className="bg-white rounded-lg border border-gray-100 hover:border-primary/20 hover:bg-gray-50/50 transition-all duration-200"
+                            >
+                              <div className="p-4">
+                                <div className="flex items-start space-x-4">
+                                  <div className="p-2 bg-gray-50 rounded-lg">
+                                    {getFileIcon(doc.fileName)}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between">
+                                      <h4 className="text-base font-medium text-gray-900 truncate">
+                                        {doc.fileName}
+                                      </h4>
+                                      <div className="flex items-center gap-2">
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                                          onClick={() => window.open(doc.fileUrl, '_blank')}
+                                        >
+                                          <Download className="w-4 h-4 mr-1" />
+                                          Download
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                                          onClick={() => handleDeleteDocument(doc._id)}
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                      </div>
+                                    </div>
+                                    <div className="mt-1 flex items-center text-sm text-gray-500">
+                                      <Calendar className="w-4 h-4 mr-1" />
+                                      <span>
+                                        Uploaded on {formatDate(doc.uploadDate)}
+                                      </span>
+                                    </div>
+                                    <div className="mt-2 flex items-center gap-2">
+                                      {doc.fileName.endsWith('.pdf') && (
+                                        <Badge variant="secondary" className="bg-red-50 text-red-700 hover:bg-red-100">
+                                          PDF
+                                        </Badge>
+                                      )}
+                                      {(doc.fileName.endsWith('.doc') || doc.fileName.endsWith('.docx')) && (
+                                        <Badge variant="secondary" className="bg-blue-50 text-blue-700 hover:bg-blue-100">
+                                          {doc.fileName.endsWith('.doc') ? 'DOC' : 'DOCX'}
+                                        </Badge>
+                                      )}
+                                      {(doc.fileName.endsWith('.jpg') || doc.fileName.endsWith('.jpeg') || doc.fileName.endsWith('.png')) && (
+                                        <Badge variant="secondary" className="bg-green-50 text-green-700 hover:bg-green-100">
+                                          {doc.fileName.split('.').pop()?.toUpperCase()}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-12 bg-gray-50/50 rounded-lg border-2 border-dashed border-gray-200">
+                          <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                          <h3 className="text-lg font-medium text-gray-900 mb-1">No Documents</h3>
                         <p className="text-gray-500">
-                          No documents uploaded yet.
+                            You haven't uploaded any medical documents yet.
                         </p>
                       </div>
+                      )}
                     </div>
                   </TabsContent>
                 </Tabs>
               </div>
-            </div>
-
-            {/* Working Hours Section */}
-            <div className="mt-8 bg-white rounded-lg border border-gray-100 p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-semibold text-gray-900">Working Hours</h2>
-                {!isEditingHours ? (
-                  <Button 
-                    onClick={() => setIsEditingHours(true)}
-                    variant="outline"
-                    className="bg-primary/10 hover:bg-primary/20 text-primary"
-                  >
-                    Edit Working Hours
-                  </Button>
-                ) : (
-                  <div className="flex gap-2">
-                    <Button 
-                      onClick={handleSaveHours}
-                      className="bg-primary text-white"
-                    >
-                      Save Changes
-                    </Button>
-                    <Button 
-                      variant="outline"
-                      onClick={() => {
-                        setIsEditingHours(false);
-                        setEditedHours(user?.workingHours || []);
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                )}
-              </div>
-
-              {isEditingHours ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {editedHours.map((hour, index) => (
-                    <div key={index} className="bg-gray-50/80 p-4 rounded-lg space-y-4">
-                      <div className="flex justify-between items-center">
-                        <Label className="text-base font-medium">{hour.day}</Label>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <Label className="text-sm text-gray-500">From</Label>
-                          <Input
-                            type="time"
-                            value={parseTime(hour.from)}
-                            onChange={(e) => handleHoursChange(index, 'from', e.target.value)}
-                            className="mt-1"
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-sm text-gray-500">To</Label>
-                          <Input
-                            type="time"
-                            value={parseTime(hour.to)}
-                            onChange={(e) => handleHoursChange(index, 'to', e.target.value)}
-                            className="mt-1"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {editedHours.map((hour, index) => (
-                    hour.from && hour.to ? (
-                      <div key={index} className="bg-gray-50/80 p-4 rounded-lg">
-                        <div className="flex flex-col">
-                          <p className="font-medium text-gray-900 mb-2">{hour.day}</p>
-                          <p className="text-sm text-gray-500">{hour.from} - {hour.to}</p>
-                        </div>
-                      </div>
-                    ) : null
-                  ))}
-                </div>
-              )}
             </div>
           </div>
         </div>

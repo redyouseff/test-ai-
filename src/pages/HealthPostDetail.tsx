@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -18,17 +17,19 @@ import {
   ThumbsUp
 } from 'lucide-react';
 import { fetchPostById, commentOnPost, likePost, requestConsultation } from '@/api/healthyTalk';
-import { useAuth } from '@/contexts/AuthContext';
-import { CommentForm } from '@/types/healthyTalk';
+import { useSelector } from 'react-redux';
+import { RootState } from '../redux/types';
 import { toast } from '@/hooks/use-toast';
 
 const HealthPostDetail = () => {
   const { postId } = useParams<{ postId: string }>();
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  const { user: currentUser } = useSelector((state: RootState) => state.auth);
+  const [post, setPost] = useState<any>(null);
   const [comment, setComment] = useState('');
+  const [loading, setLoading] = useState(true);
   
-  const { data: post, isLoading, error } = useQuery({
+  const { data: postData, isLoading, error } = useQuery({
     queryKey: ['healthPost', postId],
     queryFn: () => fetchPostById(postId!),
     enabled: !!postId
@@ -64,6 +65,17 @@ const HealthPostDetail = () => {
       });
     }
   });
+
+  useEffect(() => {
+    if (!postId) return;
+
+    // Find the post
+    const foundPost = mockHealthPosts.find(p => p.id === postId);
+    if (foundPost) {
+      setPost(foundPost);
+    }
+    setLoading(false);
+  }, [postId]);
 
   const handleLike = () => {
     if (currentUser && post) {
@@ -112,10 +124,10 @@ const HealthPostDetail = () => {
     }
   };
 
-  if (isLoading) {
+  if (loading) {
     return (
       <Layout>
-        <div className="container mx-auto px-4 py-8">
+        <div className="container mx-auto py-12 px-4 text-center">
           <p>Loading post...</p>
         </div>
       </Layout>
@@ -125,9 +137,15 @@ const HealthPostDetail = () => {
   if (error || !post) {
     return (
       <Layout>
-        <div className="container mx-auto px-4 py-8">
-          <div className="text-red-500 mb-4">Error loading the post</div>
-          <Button onClick={() => navigate('/healthy-talk')}>Back to Healthy Talk</Button>
+        <div className="container mx-auto py-12 px-4 text-center">
+          <h1 className="text-2xl font-bold mb-4">Post Not Found</h1>
+          <p className="mb-8">The post you are looking for does not exist.</p>
+          <Button 
+            className="bg-primary hover:bg-primary-dark text-white"
+            onClick={() => window.history.back()}
+          >
+            Go Back
+          </Button>
         </div>
       </Layout>
     );

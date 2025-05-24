@@ -3,12 +3,52 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../redux/types';
 import Layout from '../components/layout/Layout';
 import { Button } from '@/components/ui/button';
-import { mockSpecialties } from '../data/mockData';
+import { useEffect, useState } from 'react';
+import axios from 'axios';
+import { useToast } from "@/components/ui/use-toast";
+import { Loader2 } from "lucide-react";
+
+interface Specialty {
+  _id: string;
+  name: string;
+  description: string;
+  imageCover: string;
+  doctorsCount: number;
+}
+
+interface ApiResponse {
+  message: string;
+  data: Specialty[];
+}
 
 const Index = () => {
   const navigate = useNavigate();
   const { user } = useSelector((state: RootState) => state.auth);
+  const { toast } = useToast();
+  const [specialties, setSpecialties] = useState<Specialty[]>([]);
+  const [loading, setLoading] = useState(true);
 
+  useEffect(() => {
+    const fetchSpecialties = async () => {
+      try {
+        const response = await axios.get<ApiResponse>('https://care-insight-api-9ed25d3ea3ea.herokuapp.com/api/v1/specialties');
+        if (response.data.message === "success") {
+          setSpecialties(response.data.data);
+        }
+      } catch (error) {
+        console.error('Error fetching specialties:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load specialties. Please try again later.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSpecialties();
+  }, [toast]);
     
   return (
     <Layout>
@@ -60,34 +100,49 @@ const Index = () => {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {mockSpecialties.map((specialty) => (
-              <div 
-                key={specialty.id}
-                className="bg-gray-50 rounded-lg p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-pointer"
-                onClick={() => navigate(`/specialties/${specialty.id}`)}
-              >
-                <div className="w-16 h-16 rounded-full bg-accent flex items-center justify-center mb-4 mx-auto">
-                  <span className="text-2xl text-primary-dark">
-                    {specialty.icon === 'brain' && '🧠'}
-                    {specialty.icon === 'user' && '👤'}
-                    {specialty.icon === 'heart' && '🫁'}
-                  </span>
-                </div>
-                <h3 className="text-xl font-semibold mb-3 text-center">{specialty.name}</h3>
-                <p className="text-gray-600 text-center">{specialty.description}</p>
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+              <p className="text-gray-600">Loading specialties...</p>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                {specialties.map((specialty) => (
+                  <div 
+                    key={specialty._id}
+                    className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all cursor-pointer group"
+                    onClick={() => navigate(`/specialties/${specialty._id}`)}
+                  >
+                    <div className="relative h-64 w-full overflow-hidden">
+                      <img 
+                        src={specialty.imageCover} 
+                        alt={specialty.name}
+                        className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-300"
+                      />
+                    </div>
+                    <div className="p-6">
+                      <h3 className="text-2xl font-semibold mb-3 text-center text-gray-900">{specialty.name}</h3>
+                      <p className="text-gray-600 text-center mb-4 line-clamp-2">{specialty.description}</p>
+                      <div className="flex items-center justify-center text-sm text-gray-500 border-t pt-4">
+                        <span className="font-medium">Available Doctors:</span>
+                        <span className="ml-2">{specialty.doctorsCount}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
 
-          <div className="text-center mt-12">
-            <Button 
-              className="bg-primary hover:bg-primary-dark text-white px-6 py-2"
-              onClick={() => navigate('/specialties')}
-            >
-              View All Specialties
-            </Button>
-          </div>
+              <div className="text-center mt-12">
+                <Button 
+                  className="bg-primary hover:bg-primary-dark text-white px-8 py-3 rounded-md text-lg"
+                  onClick={() => navigate('/specialties')}
+                >
+                  View All Specialties
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       </section>
 
@@ -115,7 +170,7 @@ const Index = () => {
                 <span className="text-lg font-bold text-primary">2</span>
               </div>
               <h3 className="text-xl font-semibold mb-2">Select Specialty</h3>
-              <p className="text-gray-700">Choose from brain, skin, or chest cancer specialists</p>
+              <p className="text-gray-700">Choose from our cancer specialists</p>
             </div>
             
             <div className="text-center">

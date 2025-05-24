@@ -1,14 +1,15 @@
-
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
+import { useSelector } from 'react-redux';
+import { RootState } from '../redux/types';
 import Layout from '../components/layout/Layout';
 import { mockDoctors } from '../data/mockData';
 import { DoctorProfile } from '../types';
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
+import { Clock, MapPin } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
 import {
   Select,
   SelectContent,
@@ -16,37 +17,111 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { format } from 'date-fns';
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Clock } from 'lucide-react';
+import axios from 'axios';
+import { Calendar as CalendarIcon } from 'lucide-react';
+
+interface TimeRange {
+  start: string;
+  end: string;
+}
+
+interface DaySchedule {
+  day: string;
+  hours: TimeRange[];
+}
+
+interface WorkingHour {
+  day: string;
+  from: string;
+  to: string;
+}
+
+interface Doctor {
+  _id: string;
+  fullName: string;
+  email: string;
+  phoneNumber: string;
+  gender: string;
+  specialty: {
+    _id: string;
+    name: string;
+    description: string;
+  };
+  clinicLocation: string;
+  certifications: string[];
+  workingHours: DaySchedule[];
+  availability: string[];
+  averageRating: number;
+  numberOfReviews: number;
+  profileImage: string;
+  bio?: string;
+  availableDays?: string[];
+  availableHours?: DaySchedule[];
+}
 
 const BookAppointment = () => {
   const { doctorId } = useParams<{ doctorId: string }>();
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  const { user: currentUser } = useSelector((state: RootState) => state.auth);
   const { toast } = useToast();
-  const [doctor, setDoctor] = useState<DoctorProfile | null>(null);
+  const [doctor, setDoctor] = useState<Doctor | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedTime, setSelectedTime] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
   const [availableTimes, setAvailableTimes] = useState<string[]>([]);
   const [reason, setReason] = useState<string>("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!doctorId) return;
+    const fetchDoctor = async () => {
+      if (!doctorId) return;
 
-    const foundDoctor = mockDoctors.find(doc => doc.id === doctorId);
-    if (foundDoctor) {
-      setDoctor(foundDoctor);
-    }
-  }, [doctorId]);
+      try {
+        const response = await axios.get(
+          `https://care-insight-api-9ed25d3ea3ea.herokuapp.com/api/v1/users/${doctorId}`
+        );
+
+        if (response.data.message === "success") {
+          const doctorData = response.data.data;
+          // Transform working hours to available hours format
+          const availableHours = doctorData.workingHours.map((schedule: WorkingHour) => ({
+            day: schedule.day,
+            hours: [{
+              start: schedule.from,
+              end: schedule.to
+            }]
+          }));
+          
+          setDoctor({
+            ...doctorData,
+            availableHours,
+            availableDays: doctorData.workingHours.map((wh: WorkingHour) => wh.day)
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching doctor:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load doctor information. Please try again later.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDoctor();
+  }, [doctorId, toast]);
 
   // Generate available times when a date is selected
   useEffect(() => {
     if (selectedDate && doctor) {
       // Get day of week
-      const dayOfWeek = new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long' });
+      const dayOfWeek = selectedDate.toLocaleDateString('en-US', { weekday: 'long' });
       
       // Check if doctor is available on this day
       if (doctor.availableDays?.includes(dayOfWeek)) {
@@ -69,7 +144,7 @@ const BookAppointment = () => {
               currentHour < endHour || 
               (currentHour === endHour && currentMinute < endMinute)
             ) {
-              times.push(`${currentHour}:${currentMinute === 0 ? '00' : currentMinute}`);
+              times.push(`${currentHour.toString().padStart(2, '0')}:${currentMinute === 0 ? '00' : currentMinute}`);
               
               // Advance by 30 minutes
               currentMinute += 30;
@@ -85,14 +160,14 @@ const BookAppointment = () => {
           setAvailableTimes([]);
           toast({
             title: "No Hours Available",
-            description: `Dr. ${doctor.name} does not have specific hours set for ${dayOfWeek}. Please select another day.`,
+            description: `Dr. ${doctor.fullName} does not have specific hours set for ${dayOfWeek}. Please select another day.`,
           });
         }
       } else {
         setAvailableTimes([]);
         toast({
           title: "Doctor Not Available",
-          description: `Dr. ${doctor.name} is not available on ${dayOfWeek}s. Please select another day.`,
+          description: `Dr. ${doctor.fullName} is not available on ${dayOfWeek}s. Please select another day.`,
         });
       }
     } else {
@@ -100,7 +175,14 @@ const BookAppointment = () => {
     }
   }, [selectedDate, doctor, toast]);
 
-  const handleBookAppointment = () => {
+  // Format time for display
+  const formatTime = (time: string) => {
+    const [hours, minutes] = time.split(':');
+    const hour = parseInt(hours);
+    return `${hour > 12 ? hour - 12 : hour}:${minutes} ${hour >= 12 ? 'PM' : 'AM'}`;
+  };
+
+  const handleBookAppointment = async () => {
     if (!currentUser) {
       navigate('/login');
       return;
@@ -115,32 +197,63 @@ const BookAppointment = () => {
       return;
     }
 
-    // In a real app, this would create an appointment in the database
-    toast({
-      title: "Appointment Booked Successfully",
-      description: `Your appointment with Dr. ${doctor?.name} has been scheduled for ${selectedDate.toLocaleDateString()} at ${formatTime(selectedTime)}.`,
-    });
-    
-    navigate('/dashboard');
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        'https://care-insight-api-9ed25d3ea3ea.herokuapp.com/api/v1/appointments',
+        {
+          doctorId,
+          date: selectedDate.toISOString(),
+          time: selectedTime,
+          reason,
+          notes
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (response.status === 201) {
+        toast({
+          title: "Appointment Booked Successfully",
+          description: `Your appointment with Dr. ${doctor?.fullName} has been scheduled for ${selectedDate.toLocaleDateString()} at ${formatTime(selectedTime)}.`,
+        });
+        navigate('/dashboard');
+      }
+    } catch (error) {
+      console.error('Error booking appointment:', error);
+      toast({
+        title: "Error",
+        description: "Failed to book appointment. Please try again later.",
+        variant: "destructive",
+      });
+    }
   };
 
-  // Format time for display
-  const formatTime = (time: string) => {
-    const [hours, minutes] = time.split(':');
-    const hour = parseInt(hours);
-    return `${hour > 12 ? hour - 12 : hour}:${minutes} ${hour >= 12 ? 'PM' : 'AM'}`;
-  };
+  if (loading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </Layout>
+    );
+  }
 
   if (!doctor) {
     return (
       <Layout>
         <div className="container mx-auto py-12 px-4 text-center">
-          <p>Doctor not found.</p>
+          <h1 className="text-2xl font-bold mb-4">Doctor Not Found</h1>
+          <p className="mb-8">The doctor you are looking for does not exist.</p>
           <Button 
-            className="mt-4 bg-primary hover:bg-primary-dark text-white"
+            className="bg-primary hover:bg-primary-dark text-white"
             onClick={() => navigate('/specialties')}
           >
-            Return to Specialties
+            Back to Specialties
           </Button>
         </div>
       </Layout>
@@ -150,7 +263,7 @@ const BookAppointment = () => {
   return (
     <Layout>
       <div className="container mx-auto py-12 px-4">
-        <h1 className="text-2xl font-bold mb-6">Book an Appointment with {doctor.name}</h1>
+        <h1 className="text-2xl font-bold mb-6">Book an Appointment with {doctor.fullName}</h1>
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Doctor Information */}
@@ -161,25 +274,29 @@ const BookAppointment = () => {
                   {doctor.profileImage ? (
                     <img 
                       src={doctor.profileImage} 
-                      alt={doctor.name} 
+                      alt={doctor.fullName} 
                       className="w-full h-full rounded-full object-cover" 
                     />
                   ) : (
                     <span className="text-primary-dark font-bold text-3xl">
-                      {doctor.name.charAt(0).toUpperCase()}
+                      {doctor.fullName.charAt(0).toUpperCase()}
                     </span>
                   )}
                 </div>
-                <h2 className="text-xl font-bold">{doctor.name}</h2>
-                <p className="text-gray-600 mt-1 capitalize">{doctor.specialty.replace('-', ' ')}</p>
-                <p className="text-sm text-gray-500 mt-2">{doctor.workPlace}</p>
+                <h2 className="text-xl font-bold">{doctor.fullName}</h2>
+                <p className="text-gray-600 mt-1 capitalize">
+                  {doctor.specialty?.name?.replace('-', ' ') || 'Specialty not specified'}
+                </p>
+                <p className="text-sm text-gray-500 mt-2">{doctor.clinicLocation}</p>
               </div>
 
               <div className="space-y-4">
-                <div>
-                  <h3 className="font-medium mb-1">About Doctor</h3>
-                  <p className="text-sm text-gray-600">{doctor.bio}</p>
-                </div>
+                {doctor.bio && (
+                  <div>
+                    <h3 className="font-medium mb-1">About Doctor</h3>
+                    <p className="text-sm text-gray-600">{doctor.bio}</p>
+                  </div>
+                )}
 
                 <div>
                   <h3 className="font-medium mb-1">Available Days</h3>
@@ -326,6 +443,7 @@ const BookAppointment = () => {
                     onClick={handleBookAppointment}
                     disabled={!selectedDate || !selectedTime || !reason}
                   >
+                    <CalendarIcon className="w-5 h-5 mr-2" />
                     Confirm Appointment
                   </Button>
                 </div>
