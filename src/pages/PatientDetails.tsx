@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import DashboardLayout from '../components/layout/DashboardLayout';
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,9 +17,42 @@ import api from '../redux/api';
 
 interface PatientFile {
   id: string;
-  fileName: string;
-  fileType: string;
-  uploadDate: string;
+  name: string;
+  url: string;
+  type: string;
+}
+
+interface FilesResponse {
+  counts: {
+    all: number;
+    images: number;
+    documents: number;
+    other: number;
+  };
+  results: number;
+  files: PatientFile[];
+}
+
+interface Medication {
+  name: string;
+  dosage: string;
+  frequency: string;
+  duration: string;
+  _id: string;
+}
+
+interface MedicalRecord {
+  id: string;
+  diagnosis: string;
+  treatment: {
+    medications: Medication[];
+    recommendations: string[];
+  };
+  doctor: {
+    name: string;
+    specialty: string;
+  };
+  date: string;
 }
 
 interface PatientData {
@@ -38,30 +71,72 @@ interface PatientData {
     email: string;
     phoneNumber: string;
   };
-  files: PatientFile[];
+  medicalRecords: MedicalRecord[];
 }
 
 const PatientDetails = () => {
   const { patientId } = useParams();
   const [patientData, setPatientData] = useState<PatientData | null>(null);
+  const [filesData, setFilesData] = useState<FilesResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const fetchFiles = async (filterBy: string = 'all') => {
+    try {
+      const url = filterBy === 'all' 
+        ? `/api/v1/users/patients/${patientId}/files`
+        : `/api/v1/users/patients/${patientId}/files?filterBy=${filterBy}`;
+      
+      const response = await api.get(url);
+      setFilesData(response.data.data);
+      setActiveTab(filterBy);
+    } catch (err) {
+      setError('Failed to fetch files');
+    }
+  };
 
   useEffect(() => {
-    const fetchPatientData = async () => {
+    const fetchData = async () => {
       try {
-        const response = await api.get(`/api/v1/users/patients/${patientId}`);
-        setPatientData(response.data.data);
+        const [patientResponse] = await Promise.all([
+          api.get(`/api/v1/users/patients/${patientId}`),
+          fetchFiles('all')
+        ]);
+
+        setPatientData(patientResponse.data.data);
         setLoading(false);
       } catch (err) {
-        setError('Failed to fetch patient data');
+        setError('Failed to fetch data');
         setLoading(false);
       }
     };
 
-    fetchPatientData();
+    fetchData();
   }, [patientId]);
+
+  const handleTabChange = (tab: string) => {
+    fetchFiles(tab);
+  };
+
+  const filteredFiles = filesData?.files.filter(file => 
+    file.name.toLowerCase().includes(searchTerm.toLowerCase())
+  ) || [];
+
+  const getFileIcon = (fileType: string) => {
+    if (fileType === 'image') return <Image className="w-6 h-6 text-gray-500" />;
+    if (fileType === 'document') return <FileText className="w-6 h-6 text-gray-500" />;
+    return <File className="w-6 h-6 text-gray-500" />;
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
 
   if (loading) {
     return (
@@ -82,20 +157,6 @@ const PatientDetails = () => {
       </DashboardLayout>
     );
   }
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    });
-  };
-
-  const getFileIcon = (fileType: string) => {
-    if (fileType.includes('image')) return <Image className="w-6 h-6" />;
-    if (fileType.includes('pdf')) return <FileText className="w-6 h-6" />;
-    return <File className="w-6 h-6" />;
-  };
 
   return (
     <DashboardLayout>
@@ -118,6 +179,16 @@ const PatientDetails = () => {
               <div>
                 <h3 className="text-sm font-medium text-gray-500 mb-2">Medical Condition</h3>
                 <p className="text-gray-900">{patientData.medicalCondition.currentCondition}</p>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {patientData.medicalCondition.chronicDiseases.map((disease, index) => (
+                    <Badge key={index} variant="secondary">{disease}</Badge>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {patientData.medicalCondition.currentMedications.map((medication, index) => (
+                    <Badge key={index} variant="outline">{medication}</Badge>
+                  ))}
+                </div>
               </div>
               <div>
                 <h3 className="text-sm font-medium text-gray-500 mb-2">Contact</h3>
@@ -128,30 +199,85 @@ const PatientDetails = () => {
           </CardContent>
         </Card>
 
+        {/* Medical Records Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Medical Records History</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              {patientData.medicalRecords.map((record) => (
+                <div key={record.id} className="border rounded-lg p-4 space-y-4">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-medium">Diagnosis</h3>
+                      <p className="text-gray-600">{record.diagnosis}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-gray-500">{formatDate(record.date)}</p>
+                      <p className="text-sm font-medium">{record.doctor.name}</p>
+                    </div>
+                  </div>
+
+                  {record.treatment.medications.length > 0 && (
+                    <div>
+                      <h4 className="font-medium mb-2">Prescribed Medications</h4>
+                      <div className="space-y-2">
+                        {record.treatment.medications.map((medication) => (
+                          <div key={medication._id} className="bg-gray-50 p-3 rounded">
+                            <p className="font-medium">{medication.name}</p>
+                            <p className="text-sm text-gray-600">
+                              {medication.dosage} - {medication.frequency} for {medication.duration}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {record.treatment.recommendations.length > 0 && (
+                    <div>
+                      <h4 className="font-medium mb-2">Recommendations</h4>
+                      <ul className="list-disc list-inside text-gray-600">
+                        {record.treatment.recommendations.map((recommendation, index) => (
+                          <li key={index}>{recommendation}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
         {/* File Management Section */}
         <div className="space-y-4">
-          {/* Search and Actions */}
+          {/* Search and Filter */}
           <div className="flex items-center justify-between gap-4">
             <div className="flex-1">
               <Input 
                 type="text" 
                 placeholder="Search files by name..." 
                 className="w-full"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <Select defaultValue="all">
+            <Select 
+              value={activeTab}
+              onValueChange={handleTabChange}
+            >
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="All File Types" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All File Types</SelectItem>
-                <SelectItem value="images">Images</SelectItem>
-                <SelectItem value="documents">Documents</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
+                <SelectItem value="all">All File Types ({filesData?.counts.all || 0})</SelectItem>
+                <SelectItem value="images">Images ({filesData?.counts.images || 0})</SelectItem>
+                <SelectItem value="documents">Documents ({filesData?.counts.documents || 0})</SelectItem>
+                <SelectItem value="other">Other ({filesData?.counts.other || 0})</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline">Request New Files</Button>
-            <Button>Upload Files</Button>
           </div>
 
           {/* File Type Tabs */}
@@ -162,9 +288,9 @@ const PatientDetails = () => {
                   ? 'border-b-2 border-primary text-primary font-medium'
                   : 'text-gray-500'
               }`}
-              onClick={() => setActiveTab('all')}
+              onClick={() => handleTabChange('all')}
             >
-              All Files (4)
+              All Files ({filesData?.counts.all || 0})
             </button>
             <button
               className={`pb-2 px-1 ${
@@ -172,9 +298,9 @@ const PatientDetails = () => {
                   ? 'border-b-2 border-primary text-primary font-medium'
                   : 'text-gray-500'
               }`}
-              onClick={() => setActiveTab('images')}
+              onClick={() => handleTabChange('images')}
             >
-              Images (2)
+              Images ({filesData?.counts.images || 0})
             </button>
             <button
               className={`pb-2 px-1 ${
@@ -182,9 +308,9 @@ const PatientDetails = () => {
                   ? 'border-b-2 border-primary text-primary font-medium'
                   : 'text-gray-500'
               }`}
-              onClick={() => setActiveTab('documents')}
+              onClick={() => handleTabChange('documents')}
             >
-              Documents (2)
+              Documents ({filesData?.counts.documents || 0})
             </button>
             <button
               className={`pb-2 px-1 ${
@@ -192,51 +318,33 @@ const PatientDetails = () => {
                   ? 'border-b-2 border-primary text-primary font-medium'
                   : 'text-gray-500'
               }`}
-              onClick={() => setActiveTab('other')}
+              onClick={() => handleTabChange('other')}
             >
-              Other (0)
+              Other ({filesData?.counts.other || 0})
             </button>
           </div>
 
           {/* Files Grid */}
           <div className="grid grid-cols-3 gap-4">
-            {/* Example files - replace with actual data */}
-            <div className="bg-gray-50 rounded-lg p-4 flex items-center justify-between group">
-              <div className="flex items-center gap-3">
-                <Image className="w-6 h-6 text-gray-500" />
-                <div>
-                  <p className="font-medium">brain_scan.png</p>
-                  <p className="text-sm text-gray-500">May 5, 2025</p>
+            {filteredFiles.map((file) => (
+              <div key={file.id} className="bg-gray-50 rounded-lg p-4 flex items-center justify-between group">
+                <div className="flex items-center gap-3">
+                  {getFileIcon(file.type)}
+                  <div>
+                    <p className="font-medium">{file.name}</p>
+                    <p className="text-sm text-gray-500">{formatDate(new Date().toISOString())}</p>
+                  </div>
                 </div>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="opacity-0 group-hover:opacity-100"
+                  onClick={() => window.open(file.url, '_blank')}
+                >
+                  <Download className="w-4 h-4" />
+                </Button>
               </div>
-              <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100">
-                <Download className="w-4 h-4" />
-              </Button>
-            </div>
-            <div className="bg-gray-50 rounded-lg p-4 flex items-center justify-between group">
-              <div className="flex items-center gap-3">
-                <Image className="w-6 h-6 text-gray-500" />
-                <div>
-                  <p className="font-medium">skin_biopsy.jpg</p>
-                  <p className="text-sm text-gray-500">May 6, 2025</p>
-                </div>
-              </div>
-              <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100">
-                <Download className="w-4 h-4" />
-              </Button>
-            </div>
-            <div className="bg-gray-50 rounded-lg p-4 flex items-center justify-between group">
-              <div className="flex items-center gap-3">
-                <FileText className="w-6 h-6 text-gray-500" />
-                <div>
-                  <p className="font-medium">lab_results.pdf</p>
-                  <p className="text-sm text-gray-500">May 8, 2025</p>
-                </div>
-              </div>
-              <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100">
-                <Download className="w-4 h-4" />
-              </Button>
-            </div>
+            ))}
           </div>
         </div>
       </div>
