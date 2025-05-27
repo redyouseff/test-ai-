@@ -34,8 +34,10 @@ interface BrainTumorAnalysis {
 }
 
 interface SkinCancerAnalysis {
-  class: string;
   confidence: number;
+  diagnosis: string;
+  input_url: string;
+  predicted_class: string;
 }
 
 const AIAssistant = () => {
@@ -147,6 +149,7 @@ const AIAssistant = () => {
 
   const handleBrainTumorAnalysis = async (file: File) => {
     setIsLoadingAI(true);
+    setTumorAnalysis(null);
     try {
       const formData = new FormData();
       formData.append('image', file);
@@ -434,55 +437,60 @@ const AIAssistant = () => {
                 <div className="space-y-4 border-t border-blue-100 pt-6">
                   <h3 className="text-lg font-medium text-gray-900">Analysis Results</h3>
                   <div className="bg-white rounded-lg p-6 border border-gray-100">
-                    <div className="space-y-4">
-                      {user?.specialty === 'Skin Cancer' ? (
-                        // Skin Cancer Results
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h4 className="font-medium text-gray-900">Diagnosis</h4>
-                            <p className="text-lg font-semibold text-blue-700">
-                              {skinAnalysis?.class}
-                            </p>
-                          </div>
-                          <span className={`text-sm font-medium ${getConfidenceColor(skinAnalysis?.confidence || 0)}`}>
-                            {Math.round((skinAnalysis?.confidence || 0) * 100)}% confidence
-                          </span>
+                    {user?.specialty === 'Skin Cancer' ? (
+                      // Skin Cancer Results
+                      <div className="space-y-4">
+                        <div>
+                          <p className="text-lg font-semibold text-blue-700">
+                            {skinAnalysis?.diagnosis}
+                          </p>
+                          <p className="text-sm text-gray-600 mt-1">
+                            {skinAnalysis?.predicted_class}
+                          </p>
+                          <p className="text-sm font-medium text-gray-600 mt-1">
+                            {skinAnalysis?.confidence?.toFixed(2)}
+                          </p>
                         </div>
-                      ) : (
-                        // Brain Tumor Results
-                        <>
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <h4 className="font-medium text-gray-900">Diagnosis</h4>
-                              <p className="text-lg font-semibold text-blue-700">
-                                {getTumorClassName(tumorAnalysis?.class || '')}
-                              </p>
-                            </div>
-                            <span className={`text-sm font-medium ${getConfidenceColor(tumorAnalysis?.confidence || 0)}`}>
-                              {Math.round((tumorAnalysis?.confidence || 0) * 100)}% confidence
-                            </span>
+                        {skinAnalysis?.input_url && (
+                          <div className="mt-4">
+                            <img 
+                              src={skinAnalysis.input_url} 
+                              alt="Processed skin lesion"
+                              className="max-w-full h-auto rounded-lg border border-gray-200"
+                            />
                           </div>
+                        )}
+                      </div>
+                    ) : (
+                      // Brain Tumor Results
+                      <div className="space-y-4">
+                        <div>
+                          <p className="text-lg font-semibold text-blue-700">
+                            {getTumorClassName(tumorAnalysis?.class || '')}
+                          </p>
+                          <p className="text-sm font-medium text-gray-600">
+                            {(tumorAnalysis?.confidence || 0 * 100).toFixed(2)}
+                          </p>
+                        </div>
 
-                          <div>
-                            <h4 className="font-medium text-gray-900 mb-2">Detailed Predictions</h4>
-                            <div className="space-y-2">
-                              {tumorAnalysis?.predictions && Object.entries(tumorAnalysis.predictions).map(([key, value]) => (
-                                <div key={key} className="flex justify-between items-center">
-                                  <span className="text-sm text-gray-600">{getTumorClassName(key)}</span>
-                                  <span className="text-sm font-medium">
-                                    {Math.round(value * 100)}%
-                                  </span>
-                                </div>
-                              ))}
+                        <div className="space-y-2">
+                          {tumorAnalysis?.predictions && Object.entries(tumorAnalysis.predictions).map(([key, value]) => (
+                            <div key={key} className="flex justify-between items-center">
+                              <span className="text-sm text-gray-600">{getTumorClassName(key)}</span>
+                              <span className="text-sm font-medium">
+                                {(value * 100).toFixed(2)}
+                              </span>
                             </div>
-                          </div>
+                          ))}
+                        </div>
 
+                        {tumorAnalysis?.processing_time && (
                           <div className="text-xs text-gray-500">
-                            Processing Time: {tumorAnalysis?.processing_time.toFixed(2)}s
+                            {tumorAnalysis.processing_time.toFixed(2)}s
                           </div>
-                        </>
-                      )}
-                    </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
