@@ -9,7 +9,6 @@ import { DoctorProfile, PatientProfile, DiagnosticFile } from '../types';
 import DashboardStats from '@/components/dashboard/DashboardStats';
 import UpcomingAppointments from '@/components/dashboard/UpcomingAppointments';
 import ConnectedUsers from '@/components/dashboard/ConnectedUsers';
-import AIChatAssistant from '@/components/chat/AIChatAssistant';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from '@/components/ui/button';
@@ -55,6 +54,13 @@ interface ExtendedUser {
   phone: string;
   role: 'patient' | 'doctor';
   doctors?: Doctor[];
+  patients?: Array<{
+    _id: string;
+    fullName: string;
+    email: string;
+    profileImage?: string;
+    medicalCondition?: string;
+  }>;
   profileImage?: string;
   bloodType?: string;
   medications?: string[];
@@ -69,7 +75,6 @@ const Dashboard = () => {
   const currentUser = user as unknown as ExtendedUser;
   const [statistics, setStatistics] = useState<Statistics | null>(null);
   const [connectedUsers, setConnectedUsers] = useState<(DoctorProfile | PatientProfile)[]>([]);
-  const [showAIAssistant, setShowAIAssistant] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -377,63 +382,59 @@ const Dashboard = () => {
             )}
 
             {/* Patient list for doctors */}
-            {currentUser.role === 'doctor' && connectedUsers.length > 0 && (
+            {currentUser.role === 'doctor' && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Recent Patients</CardTitle>
+                  <CardTitle>Your Patients</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
-                    {connectedUsers.slice(0, 5).map((patient: PatientProfile) => (
-                      <div 
-                        key={patient.id} 
-                        className="flex items-center justify-between p-3 hover:bg-gray-50 rounded cursor-pointer"
-                        onClick={() => navigate(`/patient-files/${patient.id}`)}
-                      >
-                        <div className="flex items-center">
-                          <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mr-3">
-                            <span className="font-medium text-gray-700">
-                              {patient.name.charAt(0)}
-                            </span>
+                    {currentUser.patients && currentUser.patients.length > 0 ? (
+                      currentUser.patients.map((patient) => (
+                        <div 
+                          key={patient._id} 
+                          className="flex items-center justify-between p-3 hover:bg-gray-50 rounded cursor-pointer"
+                          onClick={() => navigate(`/patient/${patient._id}`)}
+                        >
+                          <div className="flex items-center">
+                            <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mr-3">
+                              {patient.profileImage ? (
+                                <img 
+                                  src={patient.profileImage}
+                                  alt={patient.fullName}
+                                  className="w-10 h-10 rounded-full object-cover"
+                                />
+                              ) : (
+                                <span className="font-medium text-gray-700">
+                                  {patient.fullName.charAt(0)}
+                                </span>
+                              )}
+                            </div>
+                            <div>
+                              <p className="font-medium">{patient.fullName}</p>
+                              <p className="text-xs text-gray-500">
+                                {patient.medicalCondition || 'No medical condition recorded'}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="font-medium">{patient.name}</p>
-                            <p className="text-xs text-gray-500">
-                              {patient.medicalCondition || 'No conditions noted'}
-                            </p>
-                          </div>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/patient/${patient._id}`);
+                            }}
+                          >
+                            View Details
+                          </Button>
                         </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-6">
+                        <p className="text-gray-500">You have no patients yet.</p>
                       </div>
-                    ))}
+                    )}
                   </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* AI Assistant for doctors only */}
-            {currentUser.role === 'doctor' && (
-              <Card className="mt-6">
-                <CardHeader>
-                  <CardTitle>AI Assistant</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {showAIAssistant ? (
-                    <div className="h-[400px]">
-                      <AIChatAssistant />
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 space-y-4">
-                      <p>
-                        Get help with patient summaries, appointment scheduling, and message drafting.
-                      </p>
-                      <button
-                        onClick={() => setShowAIAssistant(true)}
-                        className="inline-flex items-center px-4 py-2 bg-primary text-white rounded hover:bg-primary-dark"
-                      >
-                        Chat with AI Assistant
-                      </button>
-                    </div>
-                  )}
                 </CardContent>
               </Card>
             )}
