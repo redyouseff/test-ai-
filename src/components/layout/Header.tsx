@@ -21,7 +21,8 @@ import {
   User,
   LogOut,
   ChevronDown,
-  BookOpen
+  BookOpen,
+  Users
 } from 'lucide-react';
 
 export default function Header() {
@@ -44,9 +45,17 @@ export default function Header() {
   // Both doctors and patients will have access to Healthy Talk
   const navigationItems = user ? [
     { path: '/dashboard', label: 'Dashboard', icon: <FileText className="h-4 w-4" /> },
-    ...(user.role === 'doctor' ? [
-      { path: '/appointments', label: 'Appointments', icon: <Calendar className="h-4 w-4" /> }
-    ] : []),
+    { path: '/appointments', label: 'Appointments', icon: <Calendar className="h-4 w-4" /> },
+    ...(user.role === 'patient' ? [{
+      type: 'dropdown',
+      label: 'My Doctors',
+      icon: <Users className="h-4 w-4" />,
+      items: user.doctors?.map((doctor: any) => ({
+        label: doctor.fullName,
+        image: doctor.profileImage,
+        onClick: () => navigate(`/doctor/${doctor._id}`)
+      })) || []
+    }] : []),
     { path: '/healthy-talk', label: 'Healthy Talk', icon: <BookOpen className="h-4 w-4" /> },
     { path: '/messages', label: 'Messages', icon: <MessageSquare className="h-4 w-4" /> },
     { path: '/profile', label: 'Profile', icon: <User className="h-4 w-4" /> },
@@ -59,6 +68,69 @@ export default function Header() {
   ];
 
   const isActive = (path: string) => location.pathname === path;
+
+  const renderNavigationItem = (item: any) => {
+    if (item.type === 'dropdown') {
+      return (
+        <DropdownMenu key={item.label}>
+          <DropdownMenuTrigger asChild>
+            <Button 
+              variant="ghost"
+              className="px-3 py-2 text-sm text-gray-600 hover:text-primary"
+            >
+              <div className="flex items-center gap-1">
+                {item.icon}
+                <span>{item.label}</span>
+                <ChevronDown className="h-4 w-4 ml-1" />
+              </div>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-56">
+            {item.items.length > 0 ? (
+              item.items.map((subItem: any, index: number) => (
+                <DropdownMenuItem 
+                  key={index} 
+                  onClick={subItem.onClick}
+                  className="cursor-pointer"
+                >
+                  <div className="flex items-center gap-2">
+                    {subItem.image ? (
+                      <img 
+                        src={subItem.image} 
+                        alt={subItem.label} 
+                        className="w-6 h-6 rounded-full object-cover"
+                      />
+                    ) : (
+                      <User className="w-6 h-6 text-gray-400" />
+                    )}
+                    <span>{subItem.label}</span>
+                  </div>
+                </DropdownMenuItem>
+              ))
+            ) : (
+              <div className="px-2 py-4 text-sm text-gray-500 text-center">
+                No doctors found
+              </div>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      );
+    }
+
+    return (
+      <Button 
+        key={item.path}
+        variant={isActive(item.path) ? "default" : "ghost"}
+        className={`px-3 py-2 text-sm ${isActive(item.path) ? 'bg-primary text-white' : 'text-gray-600 hover:text-primary'}`}
+        onClick={() => navigate(item.path)}
+      >
+        <div className="flex items-center gap-1">
+          {item.icon}
+          <span>{item.label}</span>
+        </div>
+      </Button>
+    );
+  };
 
   return (
     <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-10">
@@ -76,19 +148,7 @@ export default function Header() {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-1">
-            {user && navigationItems.map((item) => (
-              <Button 
-                key={item.path}
-                variant={isActive(item.path) ? "default" : "ghost"}
-                className={`px-3 py-2 text-sm ${isActive(item.path) ? 'bg-primary text-white' : 'text-gray-600 hover:text-primary'}`}
-                onClick={() => navigate(item.path)}
-              >
-                <div className="flex items-center gap-1">
-                  {item.icon}
-                  <span>{item.label}</span>
-                </div>
-              </Button>
-            ))}
+            {user && navigationItems.map((item) => renderNavigationItem(item))}
 
             {!user && navigationItems.map((item) => (
               <Button 
@@ -191,22 +251,67 @@ export default function Header() {
         {/* Mobile Navigation */}
         {isMobileMenuOpen && (
           <nav className="md:hidden py-4">
-            {navigationItems.map((item) => (
-              <Button
-                key={item.path}
-                variant="ghost"
-                className={`w-full justify-start px-4 py-2 text-sm ${
-                  isActive(item.path) ? 'bg-primary text-white' : 'text-gray-600'
-                }`}
-                onClick={() => {
-                  navigate(item.path);
-                  setIsMobileMenuOpen(false);
-                }}
-              >
-                {item.icon && <span className="mr-2">{item.icon}</span>}
-                {item.label}
-              </Button>
-            ))}
+            {navigationItems.map((item) => {
+              if (item.type === 'dropdown') {
+                return (
+                  <div key={item.label} className="px-4 py-2">
+                    <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
+                      {item.icon}
+                      <span>{item.label}</span>
+                    </div>
+                    <div className="pl-6 space-y-2">
+                      {item.items.length > 0 ? (
+                        item.items.map((subItem: any, index: number) => (
+                          <Button
+                            key={index}
+                            variant="ghost"
+                            className="w-full justify-start text-sm text-gray-600"
+                            onClick={() => {
+                              subItem.onClick();
+                              setIsMobileMenuOpen(false);
+                            }}
+                          >
+                            <div className="flex items-center gap-2">
+                              {subItem.image ? (
+                                <img 
+                                  src={subItem.image} 
+                                  alt={subItem.label} 
+                                  className="w-6 h-6 rounded-full object-cover"
+                                />
+                              ) : (
+                                <User className="w-6 h-6 text-gray-400" />
+                              )}
+                              <span>{subItem.label}</span>
+                            </div>
+                          </Button>
+                        ))
+                      ) : (
+                        <div className="text-sm text-gray-500 pl-2">
+                          No doctors found
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <Button
+                  key={item.path}
+                  variant="ghost"
+                  className={`w-full justify-start px-4 py-2 text-sm ${
+                    isActive(item.path) ? 'bg-primary text-white' : 'text-gray-600'
+                  }`}
+                  onClick={() => {
+                    navigate(item.path);
+                    setIsMobileMenuOpen(false);
+                  }}
+                >
+                  {item.icon && <span className="mr-2">{item.icon}</span>}
+                  {item.label}
+                </Button>
+              );
+            })}
           </nav>
         )}
       </div>

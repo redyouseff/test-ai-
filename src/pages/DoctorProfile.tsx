@@ -9,6 +9,7 @@ import { Calendar, MessageSquare, Star, MapPin, Clock, Phone, Mail, GraduationCa
 import axios from 'axios';
 import { useToast } from "@/components/ui/use-toast";
 import { Textarea } from "@/components/ui/textarea";
+import MessageButton from '@/components/common/MessageButton';
 
 interface WorkingHours {
   day: string;
@@ -265,14 +266,13 @@ const DoctorProfile = () => {
                       <span className="text-gray-500">({doctor.numberOfReviews} reviews)</span>
                     </div>
                     <div className="flex gap-2 mb-6">
-                      <Button 
+                      <MessageButton 
+                        userId={doctor._id}
                         variant="outline"
-                        size="sm"
+                        size="default"
+                        showIcon={true}
                         className="flex-1"
-                        onClick={() => navigate(`/messages?doctorId=${doctor._id}`)}
-                      >
-                        Message
-                      </Button>
+                      />
                       <Button 
                         size="sm"
                         className="flex-1 bg-primary"

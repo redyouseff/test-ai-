@@ -15,13 +15,22 @@ export const login = (credentials: LoginCredentials) => async (dispatch: Dispatc
   try {
     dispatch({ type: AUTH_LOADING });
 
-    const response = await api.post(API_ENDPOINTS.login, credentials);
+    // First, get the token from login
+    const loginResponse = await api.post(API_ENDPOINTS.login, credentials);
+    const { token } = loginResponse.data;
 
-    const { token, user } = response.data;
+    // Store token in localStorage
+    localStorage.setItem('token', token);
+
+    // Then fetch the user profile using the token
+    const profileResponse = await api.get('/api/v1/users/me', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    const user = profileResponse.data.data;
     
-    // Store token and user in localStorage with error handling
+    // Store user in localStorage
     try {
-      localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
       console.log('User stored in localStorage:', localStorage.getItem('user'));
       console.log('Token stored in localStorage:', localStorage.getItem('token'));
@@ -37,7 +46,7 @@ export const login = (credentials: LoginCredentials) => async (dispatch: Dispatc
       }
     });
 
-    return response.data;
+    return { user, token };
   } catch (error: any) {
     const errorMessage = error.response?.data?.message || 'Login failed. Please try again.';
     dispatch({
@@ -52,12 +61,21 @@ export const register = (userData: RegisterData) => async (dispatch: Dispatch) =
   try {
     dispatch({ type: AUTH_LOADING });
 
-    const response = await api.post(API_ENDPOINTS.register, userData);
-
-    const { token, user } = response.data;
+    // First, register and get the token
+    const registerResponse = await api.post(API_ENDPOINTS.register, userData);
+    const { token } = registerResponse.data;
     
-    // Store token and user in localStorage
+    // Store token in localStorage
     localStorage.setItem('token', token);
+
+    // Then fetch the user profile using the token
+    const profileResponse = await api.get('/api/v1/users/me', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    const user = profileResponse.data.data;
+    
+    // Store user in localStorage
     localStorage.setItem('user', JSON.stringify(user));
     
     dispatch({
@@ -68,7 +86,7 @@ export const register = (userData: RegisterData) => async (dispatch: Dispatch) =
       }
     });
 
-    return response.data;
+    return { user, token };
   } catch (error: any) {
     const errorMessage = error.response?.data?.message || 'Registration failed. Please try again.';
     dispatch({

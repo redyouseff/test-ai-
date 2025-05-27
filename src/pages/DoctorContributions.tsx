@@ -13,6 +13,7 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../redux/types';
 import { toast } from "@/hooks/use-toast";
 import { Plus, Edit, Search, Heart, MessageSquare, Calendar } from "lucide-react";
+import MessageButton from '@/components/common/MessageButton';
 
 interface Contribution {
   id: string;
@@ -254,19 +255,26 @@ const DoctorContributions = () => {
                   {doctors?.slice(0, 5).map((doctor) => (
                     <div
                       key={doctor.id}
-                      className="flex items-center gap-2 cursor-pointer hover:bg-accent p-2 rounded-md transition-colors"
-                      onClick={() => navigate(`/doctor/${doctor.id}`)}
+                      className="flex items-center justify-between gap-2 cursor-pointer hover:bg-accent p-2 rounded-md transition-colors"
                     >
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={doctor.profileImage} alt={doctor.name} />
-                        <AvatarFallback>{doctor.name.charAt(0)}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="text-sm font-medium">Dr. {doctor.name}</p>
-                        {doctor.role === 'doctor' && (
-                          <p className="text-xs text-muted-foreground">{doctor.specialty}</p>
-                        )}
+                      <div className="flex items-center gap-2" onClick={() => navigate(`/doctor/${doctor.id}`)}>
+                        <Avatar className="h-8 w-8">
+                          <AvatarImage src={doctor.profileImage} alt={doctor.name} />
+                          <AvatarFallback>{doctor.name.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="text-sm font-medium">Dr. {doctor.name}</p>
+                          {doctor.role === 'doctor' && (
+                            <p className="text-xs text-muted-foreground">{doctor.specialty}</p>
+                          )}
+                        </div>
                       </div>
+                      <MessageButton 
+                        userId={doctor.id}
+                        variant="ghost"
+                        size="sm"
+                        showIcon={true}
+                      />
                     </div>
                   ))}
                 </div>

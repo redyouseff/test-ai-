@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 
 // Pages
@@ -36,7 +36,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
+      <Router>
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
@@ -49,6 +49,7 @@ const App = () => (
           <Route path="/profile" element={<Profile />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/messages" element={<Messages />} />
+          <Route path="/message/:userId" element={<Messages />} />
           <Route path="/laboratories" element={<Laboratories />} />
           <Route path="/health-tools" element={<HealthTools />} />
           <Route path="/medical-records" element={<MedicalRecords />} />
@@ -58,10 +59,10 @@ const App = () => (
           <Route path="/doctor-contributions/new" element={<NewContribution />} />
           <Route path="/healthy-talk" element={<HealthyTalk />} />
           <Route path="/healthy-talk/:postId" element={<HealthPostDetail />} />
-          <Route path="/appointments/:appointmentId" element={<AppointmentDetails />} />
+          <Route path="/appointment/:id" element={<AppointmentDetails />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
-      </BrowserRouter>
+      </Router>
     </TooltipProvider>
   </QueryClientProvider>
 );

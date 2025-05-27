@@ -178,11 +178,19 @@ const Profile = () => {
         });
         setEditedHours(initialHours);
       } else {
-        // For non-doctors, initialize with basic info only
+        // For patients, initialize with all patient info
         setEditedData({
           fullName: user.fullName,
           email: user.email,
           phoneNumber: user.phoneNumber,
+          gender: user.gender,
+          age: user.age,
+          height: user.height,
+          weight: user.weight,
+          bloodType: user.bloodType,
+          medicalCondition: user.medicalCondition,
+          chronicDiseases: user.chronicDiseases || [],
+          currentMedications: user.currentMedications || []
         });
       }
       fetchMedicalDocuments();
@@ -513,6 +521,9 @@ const Profile = () => {
               workingHours: response.data.data.workingHours
             }
           });
+
+          // Fetch fresh profile data to ensure everything is up to date
+          dispatch(fetchProfile() as unknown as AnyAction);
         }
       }
     } catch (error) {
@@ -541,409 +552,133 @@ const Profile = () => {
     if (!user || user.role !== 'patient') return null;
     
     return (
-      <div className="flex flex-col lg:flex-row gap-6">
+      <div className="flex">
         {/* Left Side - Profile Photo */}
-        <div className="w-full lg:w-[300px]">
-          <div className="bg-white rounded-lg border border-gray-100 p-6">
-            <div className="flex flex-col items-center text-center">
-              <div className="w-32 h-32 rounded-full bg-gray-50 flex items-center justify-center mb-4 border-4 border-gray-50 relative group">
-                {user.profileImage ? (
-                  <img 
-                    src={user.profileImage} 
-                    alt={user.fullName} 
-                    className="w-full h-full rounded-full object-cover" 
-                  />
-                ) : (
-                  <div className="w-full h-full rounded-full bg-gray-50 flex items-center justify-center">
-                    <UserIcon size={48} className="text-gray-300" />
-                  </div>
-                )}
-              </div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-1">{user.fullName}</h2>
-              <p className="text-gray-500 mb-4 capitalize">{user.role}</p>
-              <Button 
-                variant="outline" 
-                className="w-full"
-                onClick={() => document.getElementById('profile-image')?.click()}
-              >
-                Change Photo
-              </Button>
-              <input
-                type="file"
-                id="profile-image"
-                className="hidden"
-                accept="image/*"
-                onChange={handleImageUpload}
-              />
+        <div className="w-[300px] bg-white rounded-lg p-8">
+          <div className="flex flex-col items-center">
+            <div className="w-32 h-32 rounded-full bg-gray-100 flex items-center justify-center mb-4 overflow-hidden">
+              {user.profileImage ? (
+                <img 
+                  src={user.profileImage} 
+                  alt={user.fullName} 
+                  className="w-full h-full object-cover" 
+                />
+              ) : (
+                <UserIcon size={48} className="text-gray-300" />
+              )}
             </div>
+            <h2 className="text-xl font-semibold mb-1">{user.fullName}</h2>
+            <p className="text-gray-500 mb-6">Patient</p>
+            <Button 
+              variant="outline" 
+              className="w-full border border-gray-200 rounded-md"
+              onClick={() => document.getElementById('profile-image')?.click()}
+            >
+              Change Photo
+            </Button>
+            <input
+              type="file"
+              id="profile-image"
+              className="hidden"
+              accept="image/*"
+              onChange={handleImageUpload}
+            />
           </div>
         </div>
 
-        {/* Right Side - Profile Information */}
-        <div className="flex-1">
-          <Tabs defaultValue="profile" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 bg-gray-50/80 p-1 rounded-lg mb-6">
-              <TabsTrigger 
-                value="profile"
-                className="rounded-md py-3 text-sm font-medium data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm"
+        {/* Right Side - Information */}
+        <div className="flex-1 ml-6">
+          {/* Personal Information */}
+          <div className="bg-white rounded-lg p-8 mb-6">
+            <div className="flex justify-between items-center mb-8">
+              <h2 className="text-2xl font-bold">Personal Information</h2>
+              <Button 
+                variant="secondary"
+                className="bg-[#7C3AED] text-white hover:bg-[#6D28D9] rounded-full px-6"
+                onClick={() => setIsEditing(true)}
               >
-                Profile
-              </TabsTrigger>
-              <TabsTrigger 
-                value="documents"
-                className="rounded-md py-3 text-sm font-medium data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm"
-              >
-                Medical Documents
-              </TabsTrigger>
-            </TabsList>
+                Edit Information
+              </Button>
+            </div>
 
-            <TabsContent value="profile">
-              <div className="space-y-6">
-                {/* Personal Information Card */}
-                <div className="bg-white rounded-lg border border-gray-100 p-6">
-                  <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl font-semibold text-gray-900">Personal Information</h2>
-                    {!isEditing && (
-                      <Button 
-                        variant="secondary"
-                        className="bg-primary/10 hover:bg-primary/20 text-primary"
-                        onClick={() => setIsEditing(true)}
-                      >
-                        Edit Information
-                      </Button>
-                    )}
-                  </div>
+            <div className="grid grid-cols-2 gap-x-32 gap-y-6">
+              <div>
+                <p className="text-gray-500 text-sm">Full Name</p>
+                <p className="mt-2 text-black">{user.fullName}</p>
+              </div>
+              <div>
+                <p className="text-gray-500 text-sm">Email</p>
+                <p className="mt-2 text-black">{user.email}</p>
+              </div>
+              <div>
+                <p className="text-gray-500 text-sm">Phone</p>
+                <p className="mt-2 text-black">{user.phoneNumber}</p>
+              </div>
+              <div>
+                <p className="text-gray-500 text-sm">Age</p>
+                <p className="mt-2 text-black">{user.age}</p>
+              </div>
+              <div>
+                <p className="text-gray-500 text-sm">Gender</p>
+                <p className="mt-2 text-black capitalize">{user.gender}</p>
+              </div>
+            </div>
+          </div>
 
-                  {isEditing ? (
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                        <div>
-                          <Label className="text-sm text-gray-500">Full Name</Label>
-                          <Input
-                            value={editedData.fullName || ''}
-                            onChange={(e) => handleInputChange('fullName', e.target.value)}
-                            className="mt-1"
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-sm text-gray-500">Email</Label>
-                          <Input
-                            type="email"
-                            value={editedData.email || ''}
-                            onChange={(e) => handleInputChange('email', e.target.value)}
-                            className="mt-1"
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-sm text-gray-500">Phone</Label>
-                          <Input
-                            value={editedData.phoneNumber || ''}
-                            onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
-                            className="mt-1"
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-sm text-gray-500">Age</Label>
-                          <Input
-                            type="number"
-                            value={editedData.age || ''}
-                            onChange={(e) => handleInputChange('age', parseInt(e.target.value))}
-                            className="mt-1"
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-sm text-gray-500">Gender</Label>
-                          <Select
-                            value={editedData.gender}
-                            onValueChange={(value) => handleInputChange('gender', value)}
-                          >
-                            <SelectTrigger className="mt-1">
-                              <SelectValue placeholder="Select gender" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="male">Male</SelectItem>
-                              <SelectItem value="female">Female</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-
-                      <div className="flex justify-end gap-4 mt-6">
-                        <Button 
-                          type="button" 
-                          variant="outline"
-                          onClick={() => setIsEditing(false)}
-                        >
-                          Cancel
-                        </Button>
-                        <Button 
-                          type="submit"
-                          className="bg-primary text-white"
-                        >
-                          Save Changes
-                        </Button>
-                      </div>
-                    </form>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                      <div>
-                        <p className="text-sm text-gray-500">Full Name</p>
-                        <p className="mt-1 font-medium">{user.fullName}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-500">Email</p>
-                        <p className="mt-1 font-medium">{user.email}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-500">Phone</p>
-                        <p className="mt-1 font-medium">{user.phoneNumber}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-500">Age</p>
-                        <p className="mt-1 font-medium">{user.age} years</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-500">Gender</p>
-                        <p className="mt-1 font-medium capitalize">{user.gender}</p>
-                      </div>
-                    </div>
-                  )}
+          {/* Medical Information */}
+          <div className="bg-white rounded-lg p-8">
+            <h2 className="text-2xl font-bold mb-8">Medical Information</h2>
+            
+            <div className="space-y-8">
+              <div className="grid grid-cols-3 gap-x-32">
+                <div>
+                  <p className="text-gray-500 text-sm">Height</p>
+                  <p className="mt-2 text-black">{user.height} cm</p>
                 </div>
+                <div>
+                  <p className="text-gray-500 text-sm">Weight</p>
+                  <p className="mt-2 text-black">{user.weight} kg</p>
+                </div>
+                <div>
+                  <p className="text-gray-500 text-sm">Blood Type</p>
+                  <p className="mt-2 text-black">{user.bloodType}</p>
+                </div>
+              </div>
 
-                {/* Medical Information Card */}
-                <div className="bg-white rounded-lg border border-gray-100 p-6">
-                  <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl font-semibold text-gray-900">Medical Information</h2>
-                    {!isEditing && (
-                      <Button 
-                        variant="secondary"
-                        className="bg-primary/10 hover:bg-primary/20 text-primary"
-                        onClick={() => setIsEditing(true)}
-                      >
-                        Edit Information
-                      </Button>
-                    )}
-                  </div>
+              <div>
+                <p className="text-gray-500 text-sm">Medical Condition</p>
+                <p className="mt-2 text-black">{user.medicalCondition || 'No medical conditions'}</p>
+              </div>
 
-                  {isEditing ? (
-                    <form className="space-y-6">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div>
-                          <Label className="text-sm text-gray-500">Height (cm)</Label>
-                          <Input
-                            type="number"
-                            value={editedData.height || ''}
-                            onChange={(e) => handleInputChange('height', parseInt(e.target.value))}
-                            className="mt-1"
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-sm text-gray-500">Weight (kg)</Label>
-                          <Input
-                            type="number"
-                            value={editedData.weight || ''}
-                            onChange={(e) => handleInputChange('weight', parseInt(e.target.value))}
-                            className="mt-1"
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-sm text-gray-500">Blood Type</Label>
-                          <Select
-                            value={editedData.bloodType}
-                            onValueChange={(value) => handleInputChange('bloodType', value)}
-                          >
-                            <SelectTrigger className="mt-1">
-                              <SelectValue placeholder="Select blood type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="A+">A+</SelectItem>
-                              <SelectItem value="A-">A-</SelectItem>
-                              <SelectItem value="B+">B+</SelectItem>
-                              <SelectItem value="B-">B-</SelectItem>
-                              <SelectItem value="AB+">AB+</SelectItem>
-                              <SelectItem value="AB-">AB-</SelectItem>
-                              <SelectItem value="O+">O+</SelectItem>
-                              <SelectItem value="O-">O-</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-
-                      <div>
-                        <Label className="text-sm text-gray-500">Medical Condition</Label>
-                        <Textarea
-                          value={editedData.medicalCondition || ''}
-                          onChange={(e) => handleInputChange('medicalCondition', e.target.value)}
-                          className="mt-1"
-                          rows={4}
-                        />
-                      </div>
-
-                      <div>
-                        <Label className="text-sm text-gray-500">Chronic Diseases</Label>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {editedData.chronicDiseases?.map((disease, index) => (
-                            <Badge key={index} variant="secondary" className="px-3 py-1">
-                              {disease}
-                              <button
-                                type="button"
-                                className="ml-2 text-red-500 hover:text-red-700"
-                                onClick={() => {
-                                  const newDiseases = editedData.chronicDiseases?.filter((_, i) => i !== index) || [];
-                                  handleInputChange('chronicDiseases', newDiseases);
-                                }}
-                              >
-                                ×
-                              </button>
-                            </Badge>
-                          ))}
-                        </div>
-                        <div className="flex gap-2 mt-2">
-                          <Input
-                            placeholder="Add chronic disease"
-                            value={newDisease}
-                            onChange={(e) => setNewDisease(e.target.value)}
-                            onKeyPress={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                if (newDisease.trim()) {
-                                  handleInputChange('chronicDiseases', [...(editedData.chronicDiseases || []), newDisease.trim()]);
-                                  setNewDisease('');
-                                }
-                              }
-                            }}
-                          />
-                          <Button
-                            type="button"
-                            onClick={() => {
-                              if (newDisease.trim()) {
-                                handleInputChange('chronicDiseases', [...(editedData.chronicDiseases || []), newDisease.trim()]);
-                                setNewDisease('');
-                              }
-                            }}
-                          >
-                            Add
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div>
-                        <Label className="text-sm text-gray-500">Current Medications</Label>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {editedData.currentMedications?.map((medication, index) => (
-                            <Badge key={index} variant="secondary" className="px-3 py-1">
-                              {medication}
-                              <button
-                                type="button"
-                                className="ml-2 text-red-500 hover:text-red-700"
-                                onClick={() => {
-                                  const newMedications = editedData.currentMedications?.filter((_, i) => i !== index) || [];
-                                  handleInputChange('currentMedications', newMedications);
-                                }}
-                              >
-                                ×
-                              </button>
-                            </Badge>
-                          ))}
-                        </div>
-                        <div className="flex gap-2 mt-2">
-                          <Input
-                            placeholder="Add medication"
-                            value={newMedication}
-                            onChange={(e) => setNewMedication(e.target.value)}
-                            onKeyPress={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                if (newMedication.trim()) {
-                                  handleInputChange('currentMedications', [...(editedData.currentMedications || []), newMedication.trim()]);
-                                  setNewMedication('');
-                                }
-                              }
-                            }}
-                          />
-                          <Button
-                            type="button"
-                            onClick={() => {
-                              if (newMedication.trim()) {
-                                handleInputChange('currentMedications', [...(editedData.currentMedications || []), newMedication.trim()]);
-                                setNewMedication('');
-                              }
-                            }}
-                          >
-                            Add
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="flex justify-end gap-4 mt-6">
-                        <Button 
-                          type="button" 
-                          variant="outline"
-                          onClick={() => setIsEditing(false)}
-                        >
-                          Cancel
-                        </Button>
-                        <Button 
-                          type="submit"
-                          className="bg-primary text-white"
-                        >
-                          Save Changes
-                        </Button>
-                      </div>
-                    </form>
-                  ) : (
-                    <div className="space-y-6">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div>
-                          <p className="text-sm text-gray-500">Height</p>
-                          <p className="mt-1 font-medium">{user.height} cm</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-500">Weight</p>
-                          <p className="mt-1 font-medium">{user.weight} kg</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-500">Blood Type</p>
-                          <p className="mt-1 font-medium">{user.bloodType}</p>
-                        </div>
-                      </div>
-
-                      <div>
-                        <p className="text-sm text-gray-500">Medical Condition</p>
-                        <p className="mt-1">{user.medicalCondition || 'No information provided'}</p>
-                      </div>
-
-                      <div>
-                        <p className="text-sm text-gray-500">Chronic Diseases</p>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {user.chronicDiseases?.map((disease, index) => (
-                            <Badge key={index} variant="secondary">
-                              {disease}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div>
-                        <p className="text-sm text-gray-500">Current Medications</p>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {user.currentMedications?.map((medication, index) => (
-                            <Badge key={index} variant="secondary">
-                              {medication}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
+              <div>
+                <p className="text-gray-500 text-sm">Chronic Diseases</p>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {user.chronicDiseases?.map((disease, index) => (
+                    <Badge key={index} variant="secondary" className="px-3 py-1">
+                      {disease}
+                    </Badge>
+                  ))}
+                  {(!user.chronicDiseases || user.chronicDiseases.length === 0) && (
+                    <p className="text-gray-500">No chronic diseases</p>
                   )}
                 </div>
               </div>
-            </TabsContent>
 
-            <TabsContent value="documents">
-              {/* Medical Documents content remains the same */}
-            </TabsContent>
-          </Tabs>
+              <div>
+                <p className="text-gray-500 text-sm">Current Medications</p>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {user.currentMedications?.map((medication, index) => (
+                    <Badge key={index} variant="secondary" className="px-3 py-1">
+                      {medication}
+                    </Badge>
+                  ))}
+                  {(!user.currentMedications || user.currentMedications.length === 0) && (
+                    <p className="text-gray-500">No current medications</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -953,147 +688,137 @@ const Profile = () => {
     if (!user || user.role !== 'doctor') return null;
     const doctor = user as ExtendedUser;
     
-    // Get the doctor ID from the URL to check if we're viewing another doctor's profile
-    const pathSegments = window.location.pathname.split('/');
-    const currentDoctorId = pathSegments[pathSegments.length - 1];
-    const isOwnProfile = user._id === currentDoctorId;
-    
     return (
-      <div className="space-y-6">
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle>Professional Information</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-x-12 gap-y-6">
-              <div>
-                <p className="text-sm text-gray-500">Full Name</p>
-                <p className="text-base mt-1">{doctor.fullName || doctor.name}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Email</p>
-                <p className="text-base mt-1">{doctor.email}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Phone</p>
-                <p className="text-base mt-1">{doctor.phoneNumber || doctor.phone}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Work Place</p>
-                <p className="text-base mt-1">{doctor.clinicLocation || doctor.workPlace}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Specialty</p>
-                <p className="text-base mt-1">{doctor.specialty}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Years of Experience</p>
-                <p className="text-base mt-1">{doctor.YearsOfExperience || doctor.experience} years</p>
-              </div>
-              <div className="col-span-2">
-                <p className="text-sm text-gray-500">Professional Bio</p>
-                <p className="text-base mt-1">{doctor.ProfessionalBio || doctor.bio || `Dr. ${doctor.fullName} is a leading specialist with ${doctor.YearsOfExperience || doctor.experience} years of experience.`}</p>
-              </div>
-              <div className="col-span-2">
-                <p className="text-sm text-gray-500">Certifications</p>
-                <ul className="list-disc pl-5 mt-1">
-                  {doctor.certifications?.map((cert: string, index: number) => (
-                    <li key={index} className="text-base">{cert}</li>
-                  )) || (
-                    <>
-                      <li>Board Certified Neurologist</li>
-                      <li>Brain Cancer Specialist</li>
-                    </>
-                  )}
-                </ul>
-              </div>
+      <div className="flex">
+        {/* Left Side - Profile Photo */}
+        <div className="w-[300px] bg-white rounded-lg p-8">
+          <div className="flex flex-col items-center">
+            <div className="w-32 h-32 rounded-full bg-gray-100 flex items-center justify-center mb-4 overflow-hidden">
+              {doctor.profileImage ? (
+                <img 
+                  src={doctor.profileImage} 
+                  alt={doctor.fullName} 
+                  className="w-full h-full object-cover" 
+                />
+              ) : (
+                <UserIcon size={48} className="text-gray-300" />
+              )}
             </div>
-
+            <h2 className="text-xl font-semibold mb-1">{doctor.fullName}</h2>
+            <p className="text-gray-500 mb-6">Doctor</p>
             <Button 
-              className="bg-primary/10 hover:bg-primary/20 text-primary mt-8"
-              variant="ghost"
-              onClick={() => setIsEditing(true)}
+              variant="outline" 
+              className="w-full border border-gray-200 rounded-md"
+              onClick={() => document.getElementById('profile-image')?.click()}
             >
-              Edit Information
+              Change Photo
             </Button>
-          </CardContent>
-        </Card>
+            <input
+              type="file"
+              id="profile-image"
+              className="hidden"
+              accept="image/*"
+              onChange={handleImageUpload}
+            />
+          </div>
+        </div>
 
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle>Availability</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {user?.availability?.map((day) => (
-                <Badge 
-                  key={day}
-                  variant="secondary" 
-                  className="bg-primary/10 hover:bg-primary/20 text-primary"
-                >
-                  {day}
-                </Badge>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Only show review form if viewing another doctor's profile */}
-        {!isOwnProfile && (
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle>Leave a Review</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form 
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  handleReviewSubmit(e);
-                }}
-                className="space-y-4"
+        {/* Right Side - Information */}
+        <div className="flex-1 ml-6">
+          {/* Professional Information */}
+          <div className="bg-white rounded-lg p-8 mb-6">
+            <div className="flex justify-between items-center mb-8">
+              <h2 className="text-2xl font-bold">Professional Information</h2>
+              <Button 
+                variant="secondary"
+                className="bg-[#7C3AED] text-white hover:bg-[#6D28D9] rounded-full px-6"
+                onClick={() => setIsEditing(true)}
               >
-                <div className="space-y-2">
-                  <Label>Your Rating</Label>
-                  <div className="flex items-center gap-1">
-                    {renderRatingStars(true)}
+                Edit Information
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-x-32 gap-y-6">
+              <div>
+                <p className="text-gray-500 text-sm">Full Name</p>
+                <p className="mt-2 text-black">{doctor.fullName}</p>
+              </div>
+              <div>
+                <p className="text-gray-500 text-sm">Email</p>
+                <p className="mt-2 text-black">{doctor.email}</p>
+              </div>
+              <div>
+                <p className="text-gray-500 text-sm">Phone</p>
+                <p className="mt-2 text-black">{doctor.phoneNumber}</p>
+              </div>
+              <div>
+                <p className="text-gray-500 text-sm">Specialty</p>
+                <p className="mt-2 text-black">{doctor.specialty}</p>
+              </div>
+              <div>
+                <p className="text-gray-500 text-sm">Clinic Location</p>
+                <p className="mt-2 text-black">{doctor.clinicLocation}</p>
+              </div>
+              <div>
+                <p className="text-gray-500 text-sm">Rating</p>
+                <div className="flex items-center gap-2">
+                  <div className="flex">
+                    {renderRatingStars(false)}
+                  </div>
+                  <span className="text-sm text-gray-500">
+                    ({doctor.numberOfReviews || 0} reviews)
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Certifications */}
+          <div className="bg-white rounded-lg p-8">
+            <h2 className="text-2xl font-bold mb-8">Certifications</h2>
+            <div className="space-y-4">
+              {doctor.certifications?.map((cert, index) => (
+                <div key={index} className="flex items-center gap-3 bg-gray-50 p-4 rounded-lg">
+                  <FileText className="h-5 w-5 text-primary" />
+                  <p className="text-gray-900">{cert}</p>
+                </div>
+              ))}
+              {(!doctor.certifications || doctor.certifications.length === 0) && (
+                <p className="text-gray-500">No certifications added yet</p>
+              )}
+            </div>
+          </div>
+
+          {/* Working Hours */}
+          <div className="bg-white rounded-lg p-8 mt-6">
+            <div className="flex justify-between items-center mb-8">
+              <h2 className="text-2xl font-bold">Working Hours</h2>
+              <Button 
+                variant="secondary"
+                className="bg-[#7C3AED] text-white hover:bg-[#6D28D9] rounded-full px-6"
+                onClick={() => setIsEditingHours(true)}
+              >
+                Edit Hours
+              </Button>
+            </div>
+            
+            <div className="space-y-4">
+              {doctor.workingHours?.map((schedule, index) => (
+                <div key={index} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+                  <span className="font-medium w-32">{schedule.day}</span>
+                  <div className="flex gap-2">
+                    <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm">
+                      {schedule.from} - {schedule.to}
+                    </span>
                   </div>
                 </div>
-
-                <div className="space-y-2">
-                  <Label>Your Review</Label>
-                  <Textarea
-                    value={reviewFormData.comment}
-                    onChange={(e) => {
-                      console.log('Comment changed:', e.target.value);
-                      setReviewFormData(prev => ({
-                        ...prev,
-                        comment: e.target.value
-                      }));
-                    }}
-                    placeholder="Write your review here..."
-                    className="min-h-[100px]"
-                    required
-                  />
-                </div>
-
-                <Button
-                  type="submit"
-                  className="bg-primary text-white w-full"
-                  disabled={isSubmittingReview || !reviewFormData.comment.trim()}
-                >
-                  {isSubmittingReview ? (
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      <span>Submitting...</span>
-                    </div>
-                  ) : (
-                    'Submit Review'
-                  )}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        )}
+              ))}
+              {(!doctor.workingHours || doctor.workingHours.length === 0) && (
+                <p className="text-gray-500 text-center">No working hours set</p>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     );
   };
@@ -1381,11 +1106,6 @@ const Profile = () => {
             />
           </button>
         ))}
-        {!editable && (
-          <span className="text-sm text-gray-500 ml-2">
-            ({user?.numberOfReviews || 0} {user?.numberOfReviews === 1 ? 'review' : 'reviews'})
-          </span>
-        )}
       </div>
     );
   };
@@ -1539,11 +1259,8 @@ const Profile = () => {
                                 <div className="flex items-center gap-2">
                                   <div className="flex">
                                     {renderRatingStars(false)}
-                          </div>
-                                  <p className="text-base text-gray-900">
-                                    ({user?.numberOfReviews || 0} {user?.numberOfReviews === 1 ? 'review' : 'reviews'})
-                                  </p>
-                          </div>
+                                  </div>
+                                </div>
                           </div>
                               {renderCertificationsSection()}
                             </>

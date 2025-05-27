@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar, Star, User, MessageCircle, Loader2 } from 'lucide-react';
 import axios from 'axios';
 import { useToast } from "@/components/ui/use-toast";
+import MessageButton from '@/components/common/MessageButton';
 
 interface WorkingHours {
   day: string;
@@ -251,15 +252,22 @@ const SpecialtyDetail = () => {
                     )}
                   </CardContent>
                   <CardFooter className="pt-2 pb-4 flex flex-wrap items-center gap-1.5">
-                    <Button 
-                      className="bg-primary hover:bg-primary-dark text-white flex-1 h-8 text-sm px-3 flex items-center justify-center rounded-full"
-                      onClick={() => handleBookAppointment(doctor._id)}
-                    >
-                      <span className="w-4 h-4 rounded-full bg-primary-light/20 flex items-center justify-center mr-1.5">
-                        <Calendar className="h-2.5 w-2.5" />
-                      </span>
-                      Book
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="bg-primary text-white"
+                        onClick={() => navigate(`/book-appointment/${doctor._id}`)}
+                      >
+                        Book Appointment
+                      </Button>
+                      <MessageButton 
+                        userId={doctor._id}
+                        variant="outline"
+                        size="sm"
+                        showIcon={true}
+                      />
+                    </div>
                     <Button 
                       variant="outline"
                       className="flex-1 h-8 text-sm px-3 flex items-center justify-center rounded-full"
