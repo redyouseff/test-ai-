@@ -22,8 +22,10 @@ import {
   LogOut,
   ChevronDown,
   BookOpen,
-  Users
+  Users,
+  Brain
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export default function Header() {
   const { user } = useSelector((state: RootState) => state.auth);
@@ -60,7 +62,8 @@ export default function Header() {
     { path: '/messages', label: 'Messages', icon: <MessageSquare className="h-4 w-4" /> },
     { path: '/profile', label: 'Profile', icon: <User className="h-4 w-4" /> },
     ...(user.role === 'doctor' ? [
-      { path: '/settings', label: 'Settings', icon: <Settings className="h-4 w-4" /> }
+      { path: '/settings', label: 'Settings', icon: <Settings className="h-4 w-4" /> },
+      { path: '/ai-assistant', label: 'AI Assistant', icon: <Brain className="h-4 w-4" /> }
     ] : [])
   ] : [
     { path: '/', label: 'Home' },

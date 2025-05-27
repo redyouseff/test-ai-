@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
+import AIAssistant from './pages/AIAssistant';
 
 // Pages
 import Index from "./pages/Index";
@@ -62,6 +63,7 @@ const App = () => (
           <Route path="/healthy-talk/:postId" element={<HealthPostDetail />} />
           <Route path="/appointment/:id" element={<AppointmentDetails />} />
           <Route path="/patient/:patientId" element={<PatientDetails />} />
+          <Route path="/ai-assistant" element={<AIAssistant />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Router>

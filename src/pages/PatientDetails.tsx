@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -12,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FileText, Image, File, Download } from 'lucide-react';
+import { FileText, Image, File, Download, Brain, Sparkles, AlertCircle } from 'lucide-react';
 import api from '../redux/api';
 
 interface PatientFile {
@@ -74,6 +75,12 @@ interface PatientData {
   medicalRecords: MedicalRecord[];
 }
 
+interface AIInsight {
+  type: 'diagnosis' | 'recommendation' | 'alert';
+  content: string;
+  confidence: number;
+}
+
 const PatientDetails = () => {
   const { patientId } = useParams();
   const [patientData, setPatientData] = useState<PatientData | null>(null);
@@ -82,6 +89,9 @@ const PatientDetails = () => {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [aiQuery, setAiQuery] = useState('');
+  const [aiInsights, setAiInsights] = useState<AIInsight[]>([]);
+  const [isLoadingAI, setIsLoadingAI] = useState(false);
 
   const fetchFiles = async (filterBy: string = 'all') => {
     try {
@@ -138,6 +148,60 @@ const PatientDetails = () => {
     });
   };
 
+  // Mock AI insights - Replace this with actual API call
+  const generateAIInsights = async (query: string) => {
+    setIsLoadingAI(true);
+    try {
+      // This would be replaced with an actual API call to your AI service
+      const mockInsights: AIInsight[] = [
+        {
+          type: 'diagnosis',
+          content: 'Based on the patient\'s symptoms and medical history, consider screening for cardiovascular complications due to long-term hypertension.',
+          confidence: 0.85
+        },
+        {
+          type: 'recommendation',
+          content: 'Recommend monthly blood pressure monitoring and quarterly HbA1c tests given the combination of hypertension and diabetes.',
+          confidence: 0.92
+        },
+        {
+          type: 'alert',
+          content: 'Potential drug interaction detected between current medications. Review insulin and captopril dosage.',
+          confidence: 0.78
+        }
+      ];
+      
+      setAiInsights(mockInsights);
+    } catch (error) {
+      console.error('Error generating AI insights:', error);
+    } finally {
+      setIsLoadingAI(false);
+    }
+  };
+
+  const handleAIQuery = () => {
+    if (aiQuery.trim()) {
+      generateAIInsights(aiQuery);
+    }
+  };
+
+  const getInsightIcon = (type: AIInsight['type']) => {
+    switch (type) {
+      case 'diagnosis':
+        return <Brain className="w-5 h-5 text-blue-500" />;
+      case 'recommendation':
+        return <Sparkles className="w-5 h-5 text-green-500" />;
+      case 'alert':
+        return <AlertCircle className="w-5 h-5 text-red-500" />;
+    }
+  };
+
+  const getConfidenceColor = (confidence: number) => {
+    if (confidence >= 0.9) return 'text-green-600';
+    if (confidence >= 0.7) return 'text-yellow-600';
+    return 'text-red-600';
+  };
+
   if (loading) {
     return (
       <DashboardLayout>
@@ -160,14 +224,14 @@ const PatientDetails = () => {
 
   return (
     <DashboardLayout>
-      <div className="p-6 space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Patient Files: {patientData.personalInformation.fullName}</h1>
-          <p className="text-gray-500">View and manage diagnostic files for this patient</p>
+      <div className="p-6 space-y-6 max-w-7xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold mb-2">Patient Details: {patientData?.personalInformation.fullName}</h1>
+          <p className="text-gray-500">View and manage patient information</p>
         </div>
 
         {/* Patient Summary Card */}
-        <Card className="bg-white">
+        <Card className="bg-white shadow-md">
           <CardContent className="p-6">
             <h2 className="text-xl font-semibold mb-4">Patient Summary</h2>
             <div className="grid grid-cols-3 gap-8">
@@ -199,8 +263,10 @@ const PatientDetails = () => {
           </CardContent>
         </Card>
 
+       
+
         {/* Medical Records Section */}
-        <Card>
+        <Card className="bg-white shadow-md">
           <CardHeader>
             <CardTitle>Medical Records History</CardTitle>
           </CardHeader>
@@ -252,101 +318,108 @@ const PatientDetails = () => {
         </Card>
 
         {/* File Management Section */}
-        <div className="space-y-4">
-          {/* Search and Filter */}
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex-1">
-              <Input 
-                type="text" 
-                placeholder="Search files by name..." 
-                className="w-full"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <Select 
-              value={activeTab}
-              onValueChange={handleTabChange}
-            >
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="All File Types" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All File Types ({filesData?.counts.all || 0})</SelectItem>
-                <SelectItem value="images">Images ({filesData?.counts.images || 0})</SelectItem>
-                <SelectItem value="documents">Documents ({filesData?.counts.documents || 0})</SelectItem>
-                <SelectItem value="other">Other ({filesData?.counts.other || 0})</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* File Type Tabs */}
-          <div className="flex gap-4 border-b">
-            <button
-              className={`pb-2 px-1 ${
-                activeTab === 'all'
-                  ? 'border-b-2 border-primary text-primary font-medium'
-                  : 'text-gray-500'
-              }`}
-              onClick={() => handleTabChange('all')}
-            >
-              All Files ({filesData?.counts.all || 0})
-            </button>
-            <button
-              className={`pb-2 px-1 ${
-                activeTab === 'images'
-                  ? 'border-b-2 border-primary text-primary font-medium'
-                  : 'text-gray-500'
-              }`}
-              onClick={() => handleTabChange('images')}
-            >
-              Images ({filesData?.counts.images || 0})
-            </button>
-            <button
-              className={`pb-2 px-1 ${
-                activeTab === 'documents'
-                  ? 'border-b-2 border-primary text-primary font-medium'
-                  : 'text-gray-500'
-              }`}
-              onClick={() => handleTabChange('documents')}
-            >
-              Documents ({filesData?.counts.documents || 0})
-            </button>
-            <button
-              className={`pb-2 px-1 ${
-                activeTab === 'other'
-                  ? 'border-b-2 border-primary text-primary font-medium'
-                  : 'text-gray-500'
-              }`}
-              onClick={() => handleTabChange('other')}
-            >
-              Other ({filesData?.counts.other || 0})
-            </button>
-          </div>
-
-          {/* Files Grid */}
-          <div className="grid grid-cols-3 gap-4">
-            {filteredFiles.map((file) => (
-              <div key={file.id} className="bg-gray-50 rounded-lg p-4 flex items-center justify-between group">
-                <div className="flex items-center gap-3">
-                  {getFileIcon(file.type)}
-                  <div>
-                    <p className="font-medium">{file.name}</p>
-                    <p className="text-sm text-gray-500">{formatDate(new Date().toISOString())}</p>
-                  </div>
+        <Card className="bg-white shadow-md">
+          <CardHeader>
+            <CardTitle>File Management</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Search and Filter */}
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex-1">
+                  <Input 
+                    type="text" 
+                    placeholder="Search files by name..." 
+                    className="w-full"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
                 </div>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="opacity-0 group-hover:opacity-100"
-                  onClick={() => window.open(file.url, '_blank')}
+                <Select 
+                  value={activeTab}
+                  onValueChange={handleTabChange}
                 >
-                  <Download className="w-4 h-4" />
-                </Button>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="All File Types" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All File Types ({filesData?.counts.all || 0})</SelectItem>
+                    <SelectItem value="images">Images ({filesData?.counts.images || 0})</SelectItem>
+                    <SelectItem value="documents">Documents ({filesData?.counts.documents || 0})</SelectItem>
+                    <SelectItem value="other">Other ({filesData?.counts.other || 0})</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-            ))}
-          </div>
-        </div>
+
+              {/* File Type Tabs */}
+              <div className="flex gap-4 border-b">
+                <button
+                  className={`pb-2 px-1 ${
+                    activeTab === 'all'
+                      ? 'border-b-2 border-primary text-primary font-medium'
+                      : 'text-gray-500'
+                  }`}
+                  onClick={() => handleTabChange('all')}
+                >
+                  All Files ({filesData?.counts.all || 0})
+                </button>
+                <button
+                  className={`pb-2 px-1 ${
+                    activeTab === 'images'
+                      ? 'border-b-2 border-primary text-primary font-medium'
+                      : 'text-gray-500'
+                  }`}
+                  onClick={() => handleTabChange('images')}
+                >
+                  Images ({filesData?.counts.images || 0})
+                </button>
+                <button
+                  className={`pb-2 px-1 ${
+                    activeTab === 'documents'
+                      ? 'border-b-2 border-primary text-primary font-medium'
+                      : 'text-gray-500'
+                  }`}
+                  onClick={() => handleTabChange('documents')}
+                >
+                  Documents ({filesData?.counts.documents || 0})
+                </button>
+                <button
+                  className={`pb-2 px-1 ${
+                    activeTab === 'other'
+                      ? 'border-b-2 border-primary text-primary font-medium'
+                      : 'text-gray-500'
+                  }`}
+                  onClick={() => handleTabChange('other')}
+                >
+                  Other ({filesData?.counts.other || 0})
+                </button>
+              </div>
+
+              {/* Files Grid */}
+              <div className="grid grid-cols-3 gap-4">
+                {filteredFiles.map((file) => (
+                  <div key={file.id} className="bg-gray-50 rounded-lg p-4 flex items-center justify-between group">
+                    <div className="flex items-center gap-3">
+                      {getFileIcon(file.type)}
+                      <div>
+                        <p className="font-medium">{file.name}</p>
+                        <p className="text-sm text-gray-500">{formatDate(new Date().toISOString())}</p>
+                      </div>
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="opacity-0 group-hover:opacity-100"
+                      onClick={() => window.open(file.url, '_blank')}
+                    >
+                      <Download className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </DashboardLayout>
   );
