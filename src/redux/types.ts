@@ -16,6 +16,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  specialty: string;
   role: string;
   profileImage?: string;
 }

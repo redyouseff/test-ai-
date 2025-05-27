@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Brain, Sparkles, AlertCircle, Dna, ExternalLink, Image as ImageIcon, X, Upload } from 'lucide-react';
 import api from '../redux/api';
 import { useToast } from "@/components/ui/use-toast";
+import { useSelector } from 'react-redux';
+import { RootState } from '../redux/types';
 
 interface AIInsight {
   type: 'diagnosis' | 'recommendation' | 'alert';
@@ -31,8 +33,14 @@ interface BrainTumorAnalysis {
   processing_time: number;
 }
 
+interface SkinCancerAnalysis {
+  class: string;
+  confidence: number;
+}
+
 const AIAssistant = () => {
   const { toast } = useToast();
+  const { user } = useSelector((state: RootState) => state.auth);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [aiInsights, setAiInsights] = useState<AIInsight[]>([]);
   const [isLoadingAI, setIsLoadingAI] = useState(false);
@@ -46,6 +54,7 @@ const AIAssistant = () => {
   const [geneticResults, setGeneticResults] = useState<GeneticAnalysisResponse | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [tumorAnalysis, setTumorAnalysis] = useState<BrainTumorAnalysis | null>(null);
+  const [skinAnalysis, setSkinAnalysis] = useState<SkinCancerAnalysis | null>(null);
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -58,7 +67,11 @@ const AIAssistant = () => {
         };
         reader.readAsDataURL(file);
         // Automatically analyze when image is selected
-        handleBrainTumorAnalysis(file);
+        if (user?.specialty === 'Skin Cancer') {
+          handleSkinCancerAnalysis(file);
+        } else {
+          handleBrainTumorAnalysis(file);
+        }
       } else {
         toast({
           title: "Invalid file type",
@@ -73,6 +86,8 @@ const AIAssistant = () => {
     setSelectedImage(null);
     setImagePreview(null);
     setAiInsights([]);
+    setTumorAnalysis(null);
+    setSkinAnalysis(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -153,6 +168,37 @@ const AIAssistant = () => {
       toast({
         title: "Analysis Failed",
         description: "Failed to analyze the brain scan. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoadingAI(false);
+    }
+  };
+
+  const handleSkinCancerAnalysis = async (file: File) => {
+    setIsLoadingAI(true);
+    setSkinAnalysis(null);
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const response = await api.post('/api/v1/diagnosis/skin-cancer', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      setSkinAnalysis(response.data.data);
+      
+      toast({
+        title: "Analysis Complete",
+        description: "Skin lesion analysis results are ready",
+      });
+    } catch (error) {
+      console.error('Error analyzing image:', error);
+      toast({
+        title: "Analysis Failed",
+        description: "Failed to analyze the skin lesion image. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -317,15 +363,18 @@ const AIAssistant = () => {
           </CardContent>
         </Card>
 
-        {/* Updated Brain Scan Analysis Section */}
+        {/* Updated Image Analysis Section */}
         <Card className="bg-gradient-to-r from-blue-50 to-purple-50 shadow-md border-blue-100">
           <CardHeader className="pb-4">
             <CardTitle className="flex items-center gap-2 text-blue-700">
               <Brain className="w-6 h-6" />
-              Brain Scan Analysis
+              {user?.specialty === 'Skin Cancer' ? 'Skin Lesion Analysis' : 'Brain Scan Analysis'}
             </CardTitle>
             <p className="text-sm text-gray-600 mt-1">
-              Upload brain scan images for AI-powered tumor detection
+              {user?.specialty === 'Skin Cancer' 
+                ? 'Upload skin lesion images for AI-powered cancer detection'
+                : 'Upload brain scan images for AI-powered tumor detection'
+              }
             </p>
           </CardHeader>
           <CardContent>
@@ -347,7 +396,9 @@ const AIAssistant = () => {
                     <div className="flex flex-col items-center gap-3">
                       <Upload className="w-10 h-10 text-blue-500" />
                       <div className="text-center">
-                        <p className="text-sm font-medium text-gray-700">Click to upload a brain scan</p>
+                        <p className="text-sm font-medium text-gray-700">
+                          Click to upload {user?.specialty === 'Skin Cancer' ? 'a skin lesion image' : 'a brain scan'}
+                        </p>
                         <p className="text-xs text-gray-500 mt-1">or drag and drop</p>
                       </div>
                       <p className="text-xs text-gray-400">Supported formats: JPG, PNG</p>
@@ -357,7 +408,7 @@ const AIAssistant = () => {
                   <div className="relative">
                     <img
                       src={imagePreview}
-                      alt="Selected brain scan"
+                      alt={user?.specialty === 'Skin Cancer' ? 'Selected skin lesion' : 'Selected brain scan'}
                       className="max-w-md w-full h-auto rounded-lg border border-blue-200 shadow-md"
                     />
                     <button
@@ -372,45 +423,65 @@ const AIAssistant = () => {
                 {isLoadingAI && (
                   <div className="mt-6 flex items-center gap-3">
                     <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-500 border-t-transparent"></div>
-                    <p className="text-sm text-gray-600">Analyzing brain scan...</p>
+                    <p className="text-sm text-gray-600">
+                      Analyzing {user?.specialty === 'Skin Cancer' ? 'skin lesion' : 'brain scan'}...
+                    </p>
                   </div>
                 )}
               </div>
 
-              {tumorAnalysis && (
+              {(user?.specialty === 'Skin Cancer' ? skinAnalysis : tumorAnalysis) && (
                 <div className="space-y-4 border-t border-blue-100 pt-6">
                   <h3 className="text-lg font-medium text-gray-900">Analysis Results</h3>
                   <div className="bg-white rounded-lg p-6 border border-gray-100">
                     <div className="space-y-4">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h4 className="font-medium text-gray-900">Diagnosis</h4>
-                          <p className="text-lg font-semibold text-blue-700">
-                            {getTumorClassName(tumorAnalysis.class)}
-                          </p>
+                      {user?.specialty === 'Skin Cancer' ? (
+                        // Skin Cancer Results
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h4 className="font-medium text-gray-900">Diagnosis</h4>
+                            <p className="text-lg font-semibold text-blue-700">
+                              {skinAnalysis?.class}
+                            </p>
+                          </div>
+                          <span className={`text-sm font-medium ${getConfidenceColor(skinAnalysis?.confidence || 0)}`}>
+                            {Math.round((skinAnalysis?.confidence || 0) * 100)}% confidence
+                          </span>
                         </div>
-                        <span className={`text-sm font-medium ${getConfidenceColor(tumorAnalysis.confidence)}`}>
-                          {Math.round(tumorAnalysis.confidence * 100)}% confidence
-                        </span>
-                      </div>
-
-                      <div>
-                        <h4 className="font-medium text-gray-900 mb-2">Detailed Predictions</h4>
-                        <div className="space-y-2">
-                          {Object.entries(tumorAnalysis.predictions).map(([key, value]) => (
-                            <div key={key} className="flex justify-between items-center">
-                              <span className="text-sm text-gray-600">{getTumorClassName(key)}</span>
-                              <span className="text-sm font-medium">
-                                {Math.round(value * 100)}%
-                              </span>
+                      ) : (
+                        // Brain Tumor Results
+                        <>
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <h4 className="font-medium text-gray-900">Diagnosis</h4>
+                              <p className="text-lg font-semibold text-blue-700">
+                                {getTumorClassName(tumorAnalysis?.class || '')}
+                              </p>
                             </div>
-                          ))}
-                        </div>
-                      </div>
+                            <span className={`text-sm font-medium ${getConfidenceColor(tumorAnalysis?.confidence || 0)}`}>
+                              {Math.round((tumorAnalysis?.confidence || 0) * 100)}% confidence
+                            </span>
+                          </div>
 
-                      <div className="text-xs text-gray-500">
-                        Processing Time: {tumorAnalysis.processing_time.toFixed(2)}s
-                      </div>
+                          <div>
+                            <h4 className="font-medium text-gray-900 mb-2">Detailed Predictions</h4>
+                            <div className="space-y-2">
+                              {tumorAnalysis?.predictions && Object.entries(tumorAnalysis.predictions).map(([key, value]) => (
+                                <div key={key} className="flex justify-between items-center">
+                                  <span className="text-sm text-gray-600">{getTumorClassName(key)}</span>
+                                  <span className="text-sm font-medium">
+                                    {Math.round(value * 100)}%
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="text-xs text-gray-500">
+                            Processing Time: {tumorAnalysis?.processing_time.toFixed(2)}s
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -419,7 +490,7 @@ const AIAssistant = () => {
               {!imagePreview && !isLoadingAI && (
                 <div className="text-center py-4 text-gray-500">
                   <ImageIcon className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                  <p>Upload a brain scan to get AI-powered analysis</p>
+                  <p>Upload {user?.specialty === 'Skin Cancer' ? 'a skin lesion image' : 'a brain scan'} to get AI-powered analysis</p>
                 </div>
               )}
             </div>
