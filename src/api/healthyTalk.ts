@@ -1,7 +1,7 @@
-
 import { DoctorProfile } from "@/types";
 import { mockDoctors } from "@/data/mockData";
 import { HealthPost, Comment, CommentForm, ConsultationRequest } from "@/types/healthyTalk";
+import { getApiUrl } from './config';
 
 // Mock database for health posts
 let healthPosts: HealthPost[] = [
@@ -94,28 +94,148 @@ let healthPosts: HealthPost[] = [
   }
 ];
 
+interface ApiHealthPost {
+  _id: string;
+  author: {
+    _id: string;
+    fullName: string;
+    specialty: {
+      _id: string;
+      name: string;
+    }
+  };
+  title: string;
+  content: string;
+  category: string;
+  tags: string[];
+  likes: string[];
+  image?: string;
+  comments: Array<{
+    _id: string;
+    user: {
+      _id: string;
+      fullName: string;
+      profileImage?: string;
+    };
+    text: string;
+    createdAt: string;
+  }>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface HealthPost {
+  id: string;
+  title: string;
+  content: string;
+  publishedAt: string;
+  doctor: {
+    id: string;
+    name: string;
+    specialty: string;
+    profileImage?: string;
+  };
+  likes: string[];
+  comments: Comment[];
+  tags?: string[];
+  coverImage?: string;
+  readingTime?: number;
+  category?: string;
+}
+
+const transformApiResponse = (post: any): HealthPost => {
+  // Handle tags that might be a comma-separated string in an array
+  const tagsArray = Array.isArray(post.tags) 
+    ? post.tags.flatMap(tag => 
+        typeof tag === 'string' 
+          ? tag.split(',').map(t => t.trim())
+          : tag
+      )
+    : [];
+
+  return {
+    id: post._id,
+    title: post.title,
+    content: post.content,
+    publishedAt: post.createdAt,
+    doctor: {
+      id: post.author._id,
+      name: post.author.fullName,
+      specialty: post.author.specialty?.name || 'General',
+      profileImage: undefined
+    },
+    likes: Array.isArray(post.likes) ? post.likes : [],
+    comments: Array.isArray(post.comments) 
+      ? post.comments.map(comment => ({
+          id: comment._id,
+          postId: post._id,
+          user: {
+            id: comment.user._id,
+            name: comment.user.fullName,
+            profileImage: comment.user.profileImage
+          },
+          content: comment.text,
+          createdAt: comment.createdAt,
+          likes: 0
+        }))
+      : [],
+    tags: tagsArray,
+    coverImage: post.image,
+    readingTime: Math.ceil(post.content.split(' ').length / 200)
+  };
+};
+
+interface HealthPostsFilters {
+  keyword?: string;
+  category?: string;
+  tags?: string;
+  page?: number;
+  limit?: number;
+  specialtyId?: string | null;
+  doctorId?: string | null;
+}
+
 // Mock fetch functions
 export const fetchHealthPosts = async (
-  specialtyId: string | null = null, 
-  doctorId: string | null = null
+  filters: { specialtyId?: string | null; doctorId?: string | null } = {}
 ): Promise<HealthPost[]> => {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 500));
-  
-  let filteredPosts = [...healthPosts];
-  
-  if (specialtyId) {
-    filteredPosts = filteredPosts.filter(post => {
-      const doctor = mockDoctors.find(d => d.id === post.doctor.id);
-      return doctor && doctor.specialty === specialtyId;
-    });
+  try {
+    const url = new URL(getApiUrl('/health-talks'));
+    
+    if (filters.specialtyId) {
+      url.searchParams.append('specialty', filters.specialtyId);
+    }
+    if (filters.doctorId) {
+      url.searchParams.append('doctor', filters.doctorId);
+    }
+
+    console.log('Fetching from URL:', url.toString());
+
+    const response = await fetch(url.toString());
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      throw new Error(
+        errorData?.message || `Failed to fetch health talks: ${response.status}`
+      );
+    }
+
+    const responseData = await response.json();
+    console.log('Raw API Response:', responseData);
+
+    if (!responseData.data || !Array.isArray(responseData.data)) {
+      console.error('Unexpected API response structure:', responseData);
+      return [];
+    }
+
+    const transformedPosts = responseData.data.map(transformApiResponse);
+    console.log('Transformed Posts:', transformedPosts);
+    
+    return transformedPosts;
+  } catch (error) {
+    console.error('Error fetching health talks:', error);
+    throw error;
   }
-  
-  if (doctorId) {
-    filteredPosts = filteredPosts.filter(post => post.doctor.id === doctorId);
-  }
-  
-  return filteredPosts;
 };
 
 export const fetchPostById = async (postId: string): Promise<HealthPost | null> => {

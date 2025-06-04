@@ -6,7 +6,7 @@ import DashboardLayout from '../components/layout/DashboardLayout';
 import { Appointment } from '../types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Calendar, FileText, MessageSquare } from 'lucide-react';
+import { Calendar, FileText } from 'lucide-react';
 import axios from 'axios';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -108,7 +108,8 @@ const Appointments = () => {
                 {upcomingAppointments.map((appointment) => (
                   <div 
                     key={appointment._id} 
-                    className="bg-white p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-100"
+                    className="bg-white p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-100 cursor-pointer"
+                    onClick={() => navigate(`/appointment/${appointment._id}`)}
                   >
                     <div className="flex flex-col md:flex-row justify-between">
                       <div className="flex items-start space-x-4">
@@ -132,16 +133,6 @@ const Appointments = () => {
                         <p className="text-primary font-medium">
                           {formatDate(appointment.appointmentDate)}
                         </p>
-                        <div className="flex space-x-2 mt-4">
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            className="flex items-center"
-                            onClick={() => navigate(`/messages`)}
-                          >
-                            <MessageSquare size={14} className="mr-1" /> Message
-                          </Button>
-                        </div>
                       </div>
                     </div>
 
@@ -192,7 +183,8 @@ const Appointments = () => {
                 {pastAppointments.map((appointment) => (
                   <div 
                     key={appointment._id} 
-                    className="bg-white p-6 rounded-lg shadow-sm border border-gray-100"
+                    className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-shadow"
+                    onClick={() => navigate(`/appointment/${appointment._id}`)}
                   >
                     <div className="flex flex-col md:flex-row justify-between">
                       <div className="flex items-start space-x-4">

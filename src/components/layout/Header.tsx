@@ -59,7 +59,6 @@ export default function Header() {
       })) || []
     }] : []),
     { path: '/healthy-talk', label: 'Healthy Talk', icon: <BookOpen className="h-4 w-4" /> },
-    { path: '/messages', label: 'Messages', icon: <MessageSquare className="h-4 w-4" /> },
     { path: '/profile', label: 'Profile', icon: <User className="h-4 w-4" /> },
     ...(user.role === 'doctor' ? [
       { path: '/settings', label: 'Settings', icon: <Settings className="h-4 w-4" /> },

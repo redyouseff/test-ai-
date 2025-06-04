@@ -377,7 +377,7 @@ const Dashboard = () => {
                       )}
                     </div>
                   </div>
-                </CardContent>
+                </CardContent>  
               </Card>
             )}
 
