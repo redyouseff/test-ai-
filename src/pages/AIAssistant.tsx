@@ -8,6 +8,7 @@ import api from '../redux/api';
 import { useToast } from "@/components/ui/use-toast";
 import { useSelector } from 'react-redux';
 import { RootState } from '../redux/types';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface AIInsight {
   type: 'diagnosis' | 'recommendation' | 'alert';
@@ -39,6 +40,10 @@ interface SkinCancerAnalysis {
   input_url: string;
   predicted_class: string;
 }
+
+const validGenes = ["ABL1", "ACVR1", "AGO2", "AKT1", "AKT2", "AKT3", "ALK", "APC", "AR", "ARAF", "ARID1A", "ARID1B", "ARID2", "ARID5B", "ASXL1", "ASXL2", "ATM", "ATR", "ATRX", "AURKA", "AURKB", "AXIN1", "AXL", "B2M", "BAP1", "BARD1", "BCL10", "BCL2", "BCL2L11", "BCOR", "BRAF", "BRCA1", "BRCA2", "BRD4", "BRIP1", "BTK", "CARD11", "CARM1", "CASP8", "CBL", "CCND1", "CCND2", "CCND3", "CCNE1", "CDH1", "CDK12", "CDK4", "CDK6", "CDK8", "CDKN1A", "CDKN1B", "CDKN2A", "CDKN2B", "CDKN2C", "CEBPA", "CHEK2", "CIC", "CREBBP", "CTCF", "CTLA4", "CTNNB1", "DDR2", "DICER1", "DNMT3A", "DNMT3B", "DUSP4", "EGFR", "EIF1AX", "ELF3", "EP300", "EPAS1", "EPCAM", "ERBB2", "ERBB3", "ERBB4", "ERCC2", "ERCC3", "ERCC4", "ERG", "ERRFI1", "ESR1", "ETV1", "ETV6", "EWSR1", "EZH2", "FAM58A", "FANCA", "FANCC", "FAT1", "FBXW7", "FGF19", "FGF3", "FGF4", "FGFR1", "FGFR2", "FGFR3", "FGFR4", "FLT1", "FLT3", "FOXA1", "FOXL2", "FOXO1", "FOXP1", "FUBP1", "GATA3", "GLI1", "GNA11", "GNAQ", "GNAS", "H3F3A", "HIST1H1C", "HLA-A", "HLA-B", "HNF1A", "HRAS", "IDH1", "IDH2", "IGF1R", "IKBKE", "IKZF1", "IL7R", "INPP4B", "JAK1", "JAK2", "JUN", "KDM5A", "KDM5C", "KDM6A", "KDR", "KEAP1", "KIT", "KLF4", "KMT2A", "KMT2B", "KMT2C", "KMT2D", "KNSTRN", "KRAS", "LATS1", "LATS2", "MAP2K1", "MAP2K2", "MAP2K4", "MAP3K1", "MAPK1", "MDM2", "MDM4", "MED12", "MEF2B", "MEN1", "MET", "MGA", "MLH1", "MPL", "MSH2", "MSH6", "MTOR", "MYC", "MYCN", "MYD88", "MYOD1", "NCOR1", "NF1", "NF2", "NFE2L2", "NFKBIA", "NKX2-1", "NOTCH1", "NOTCH2", "NPM1", "NRAS", "NSD1", "NTRK1", "NTRK2", "NTRK3", "NUP93", "PAK1", "PAX8", "PBRM1", "PDGFRA", "PDGFRB", "PIK3CA", "PIK3CB", "PIK3CD", "PIK3R1", "PIK3R2", "PIK3R3", "PIM1", "PMS1", "PMS2", "POLE", "PPM1D", "PPP2R1A", "PPP6C", "PRDM1", "PTCH1", "PTEN", "PTPN11", "PTPRD", "PTPRT", "RAB35", "RAC1", "RAD21", "RAD50", "RAD51B", "RAD51C", "RAD51D", "RAD54L", "RAF1", "RARA", "RASA1", "RB1", "RBM10", "RET", "RHEB", "RHOA", "RICTOR", "RIT1", "RNF43", "ROS1", "RRAS2", "RUNX1", "RXRA", "RYBP", "SDHB", "SDHC", "SETD2", "SF3B1", "SHOC2", "SHQ1", "SMAD2", "SMAD3", "SMAD4", "SMARCA4", "SMARCB1", "SMO", "SOS1", "SOX9", "SPOP", "SRC", "SRSF2", "STAG2", "STAT3", "STK11", "TCF3", "TCF7L2", "TERT", "TET1", "TET2", "TGFBR1", "TGFBR2", "TMPRSS2", "TP53", "TP53BP1", "TSC1", "TSC2", "U2AF1", "VEGFA", "VHL", "WHSC1", "WHSC1L1", "XPO1", "XRCC2", "YAP1"];
+
+const validVariations = ["1_2009trunc", "2010_2471trunc", "256_286trunc", "3' Deletion", "385_418del", "422_605trunc", "533_534del", "534_536del", "550_592del", "560_561insER", "596_619splice", "963_D1010splice", "981_1028splice", "A1020V", "A1022E", "A1065T", "A1066V", "A1099T", "A111P", "A1131T", "A113_splice", "A1170V", "A11_G12insGA", "A1200V", "A120S", "A121E", "A121P", "A121V", "A122*", "A1234T", "A126D", "A126G", "A126S", "A126V", "A134D", "A1374V", "A1459P", "A146T", "A146V", "A148T", "A149P", "A1519T", "A151T", "A159T", "A161S", "A161T", "A1669S", "A1685S", "A1701P", "A1708E", "A1708V", "A171V", "A1752P", "A1752V", "A1789S", "A1789T", "A1823T", "A1830T", "A1843P", "A1843T", "A18D", "A197T", "A19V", "A2034V", "A205T", "A209T", "A211D", "A232V", "A2351G", "A23E", "A2425T", "A246P", "A263V", "A2643G", "A2717S", "A272V", "A2770T", "A290T", "A298T", "A339V", "A347T", "A349P", "A34D", "A36P", "A389T", "A391E", "A39P", "A40E", "A41P", "A41T", "A4419S", "A459V", "A500T", "A502_Y503dup", "A504_Y505ins", "A530T", "A530V", "A532H", "A546D", "A57V", "A598T", "A598V", "A59G", "A59T", "A60V", "A614D", "A617T", "A627T", "A633T", "A633V", "A634D", "A634V", "A636P", "A648T", "A677G", "A707T", "A717G", "A723D", "A727V", "A728V", "A72S", "A72V", "A750P", "A750_E758del", "A750_E758delinsP", "A75P", "A763_Y764insFQEA", "A767_V769del", "A767_V769dup", "A77P", "A77S", "A77T", "A829P", "A859_L883delinsV", "A864T", "A883F", "A883T", "A889P", "A8S", "A919V", "A95D"];
 
 const AIAssistant = () => {
   const { toast } = useToast();
@@ -272,21 +277,33 @@ const AIAssistant = () => {
                 <div className="space-y-4">
                   <div>
                     <label className="text-sm font-medium text-gray-700 mb-1 block">Gene Name</label>
-                    <Input
-                      placeholder="e.g., BRCA1"
-                      value={geneName}
-                      onChange={(e) => setGeneName(e.target.value)}
-                      className="border-indigo-200 focus:border-indigo-400"
-                    />
+                    <Select value={geneName} onValueChange={setGeneName}>
+                      <SelectTrigger className="border-indigo-200 focus:border-indigo-400">
+                        <SelectValue placeholder="Select a gene" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {validGenes.map((gene) => (
+                          <SelectItem key={gene} value={gene}>
+                            {gene}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-700 mb-1 block">Variation</label>
-                    <Input
-                      placeholder="e.g., V600E"
-                      value={variation}
-                      onChange={(e) => setVariation(e.target.value)}
-                      className="border-indigo-200 focus:border-indigo-400"
-                    />
+                    <Select value={variation} onValueChange={setVariation}>
+                      <SelectTrigger className="border-indigo-200 focus:border-indigo-400">
+                        <SelectValue placeholder="Select a variation" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {validVariations.map((var_) => (
+                          <SelectItem key={var_} value={var_}>
+                            {var_}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-700 mb-1 block">Analysis Notes</label>

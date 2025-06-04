@@ -82,6 +82,20 @@ interface ReviewFormData {
   comment: string;
 }
 
+// Add interface for API response
+interface MedicalDocument {
+  _id: string;
+  fileName: string;
+  fileUrl: string;
+  fileType?: string;
+  uploadDate: string;
+}
+
+interface ApiResponse {
+  status: string;
+  data: MedicalDocument[];
+}
+
 const Profile = () => {
   const dispatch = useDispatch<AppDispatch>();
   const authState = useSelector((state: RootState) => state.auth);
@@ -100,6 +114,7 @@ const Profile = () => {
     _id: string;
     fileName: string;
     fileUrl: string;
+    fileType: string;
     uploadDate: string;
   }>>([]);
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
@@ -126,7 +141,7 @@ const Profile = () => {
         throw new Error('No authentication token found');
       }
 
-      const response = await axios.get<{ data: typeof medicalDocuments }>(
+      const response = await axios.get<ApiResponse>(
         'https://care-insight-api-9ed25d3ea3ea.herokuapp.com/api/v1/users/getMedicalDocuments',
         {
           headers: {
@@ -136,7 +151,15 @@ const Profile = () => {
       );
 
       if (response.data?.data) {
-        setMedicalDocuments(response.data.data);
+        // Transform the data to match our state structure
+        const transformedDocs = response.data.data.map((doc: MedicalDocument) => ({
+          _id: doc._id,
+          fileName: doc.fileName,
+          fileUrl: doc.fileUrl,
+          fileType: doc.fileType || 'unknown',
+          uploadDate: doc.uploadDate
+        }));
+        setMedicalDocuments(transformedDocs);
       }
     } catch (error: unknown) {
       let errorMessage = "Failed to fetch medical documents.";
@@ -1110,6 +1133,124 @@ const Profile = () => {
     );
   };
 
+  const handleDownload = async (fileUrl: string, fileName: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch(fileUrl, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to download file');
+      }
+
+      // Get the blob from the response
+      const blob = await response.blob();
+      
+      // Create a URL for the blob
+      const url = window.URL.createObjectURL(blob);
+      
+      // Create a temporary link element
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName; // Set the file name
+      
+      // Append to body, click, and remove
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up the URL
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: "Success",
+        description: "File downloaded successfully",
+      });
+    } catch (error) {
+      console.error('Download error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to download file",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const renderMedicalDocuments = () => {
+    if (isLoadingDocuments) {
+      return (
+        <div className="flex justify-center py-8">
+          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      );
+    }
+
+    if (!medicalDocuments || medicalDocuments.length === 0) {
+      return (
+        <div className="text-center py-12 bg-gray-50/50 rounded-lg border-2 border-dashed border-gray-200">
+          <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+          <h3 className="text-lg font-medium text-gray-900 mb-1">No Documents</h3>
+          <p className="text-gray-500">
+            You haven't uploaded any medical documents yet.
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold">Medical Documents</h3>
+          <Button onClick={handleBrowseClick} disabled={isUploading}>
+            Upload Document
+          </Button>
+        </div>
+
+        <div className="grid gap-4">
+          {medicalDocuments.map((doc) => (
+            <div
+              key={doc._id}
+              className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
+            >
+              <div className="flex items-center gap-3">
+                {getFileIcon(doc.fileName)}
+                <div>
+                  <p className="font-medium">{doc.fileName}</p>
+                  <p className="text-sm text-gray-500">
+                    Uploaded on {formatDate(doc.uploadDate)}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleDownload(doc.fileUrl, doc.fileName)}
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleDeleteDocument(doc._id)}
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <DashboardLayout>
       <div className="min-h-screen bg-gray-50/30">
@@ -1493,7 +1634,6 @@ const Profile = () => {
                           onChange={(e) => {
                             const file = e.target.files?.[0];
                             if (file) {
-                              // Add file type validation
                               const allowedTypes = [
                                 'application/pdf',
                                 'application/msword',
@@ -1511,7 +1651,6 @@ const Profile = () => {
                                 return;
                               }
 
-                              // Add file size validation (5MB max)
                               if (file.size > 5 * 1024 * 1024) {
                                 toast({
                                   title: "Error",
@@ -1541,85 +1680,7 @@ const Profile = () => {
                           </Button>
                       </div>
 
-                      {isLoadingDocuments ? (
-                        <div className="flex justify-center py-8">
-                          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-                        </div>
-                      ) : medicalDocuments.length > 0 ? (
-                        <div className="grid gap-4">
-                          {medicalDocuments.map((doc) => (
-                            <div 
-                              key={doc._id} 
-                              className="bg-white rounded-lg border border-gray-100 hover:border-primary/20 hover:bg-gray-50/50 transition-all duration-200"
-                            >
-                              <div className="p-4">
-                                <div className="flex items-start space-x-4">
-                                  <div className="p-2 bg-gray-50 rounded-lg">
-                                    {getFileIcon(doc.fileName)}
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center justify-between">
-                                      <h4 className="text-base font-medium text-gray-900 truncate">
-                                        {doc.fileName}
-                                      </h4>
-                                      <div className="flex items-center gap-2">
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
-                                          onClick={() => window.open(doc.fileUrl, '_blank')}
-                                        >
-                                          <Download className="w-4 h-4 mr-1" />
-                                          Download
-                                        </Button>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="text-red-600 hover:text-red-800 hover:bg-red-50"
-                                          onClick={() => handleDeleteDocument(doc._id)}
-                                        >
-                                          <Trash2 className="w-4 h-4" />
-                                        </Button>
-                                      </div>
-                                    </div>
-                                    <div className="mt-1 flex items-center text-sm text-gray-500">
-                                      <Calendar className="w-4 h-4 mr-1" />
-                                      <span>
-                                        Uploaded on {formatDate(doc.uploadDate)}
-                                      </span>
-                                    </div>
-                                    <div className="mt-2 flex items-center gap-2">
-                                      {doc.fileName.endsWith('.pdf') && (
-                                        <Badge variant="secondary" className="bg-red-50 text-red-700 hover:bg-red-100">
-                                          PDF
-                                        </Badge>
-                                      )}
-                                      {(doc.fileName.endsWith('.doc') || doc.fileName.endsWith('.docx')) && (
-                                        <Badge variant="secondary" className="bg-blue-50 text-blue-700 hover:bg-blue-100">
-                                          {doc.fileName.endsWith('.doc') ? 'DOC' : 'DOCX'}
-                                        </Badge>
-                                      )}
-                                      {(doc.fileName.endsWith('.jpg') || doc.fileName.endsWith('.jpeg') || doc.fileName.endsWith('.png')) && (
-                                        <Badge variant="secondary" className="bg-green-50 text-green-700 hover:bg-green-100">
-                                          {doc.fileName.split('.').pop()?.toUpperCase()}
-                                        </Badge>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-center py-12 bg-gray-50/50 rounded-lg border-2 border-dashed border-gray-200">
-                          <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                          <h3 className="text-lg font-medium text-gray-900 mb-1">No Documents</h3>
-                        <p className="text-gray-500">
-                            You haven't uploaded any medical documents yet.
-                        </p>
-                      </div>
-                      )}
+                      {renderMedicalDocuments()}
                     </div>
                   </TabsContent>
                 </Tabs>

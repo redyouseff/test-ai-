@@ -14,25 +14,65 @@ import {
   Calendar,
   Send,
   Share,
-  ThumbsUp
+  ThumbsUp,
+  ArrowLeft
 } from 'lucide-react';
 import { fetchPostById, commentOnPost, likePost, requestConsultation } from '@/api/healthyTalk';
 import { useSelector } from 'react-redux';
-import { RootState } from '../redux/types';
-import { toast } from '@/hooks/use-toast';
+import { RootState } from '@/redux/types';
+import { toast } from '@/components/ui/use-toast';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { getApiUrl } from '@/lib/utils';
+
+interface HealthPost {
+  _id: string;
+  title: string;
+  content: string;
+  category: 'Articles' | 'Case Studies' | 'Research';
+  tags: string[];
+  image?: string;
+  createdAt: string;
+  updatedAt: string;
+  author: {
+    _id: string;
+    fullName: string;
+    profileImage?: string;
+    specialty: {
+      _id: string;
+      name: string;
+    };
+  };
+  likes: Array<{
+    _id: string;
+    fullName: string;
+    profileImage?: string;
+  }>;
+  comments: Array<{
+    _id: string;
+    user: {
+      _id: string;
+      fullName: string;
+      profileImage?: string;
+    };
+    text: string;
+    createdAt: string;
+  }>;
+}
 
 const HealthPostDetail = () => {
-  const { postId } = useParams<{ postId: string }>();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user: currentUser } = useSelector((state: RootState) => state.auth);
-  const [post, setPost] = useState<any>(null);
+  const [post, setPost] = useState<HealthPost | null>(null);
   const [comment, setComment] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   
-  const { data: postData, isLoading, error } = useQuery({
-    queryKey: ['healthPost', postId],
-    queryFn: () => fetchPostById(postId!),
-    enabled: !!postId
+  const { data: postData, isLoading: queryLoading, error } = useQuery({
+    queryKey: ['healthPost', id],
+    queryFn: () => fetchPostById(id!),
+    enabled: !!id
   });
 
   const likeMutation = useMutation({
@@ -67,53 +107,149 @@ const HealthPostDetail = () => {
   });
 
   useEffect(() => {
-    if (!postId) return;
+    const fetchPost = async () => {
+      try {
+        setIsLoading(true);
+        const response = await fetch(getApiUrl(`/api/v1/health-talks/${id}`));
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch post');
+        }
+        
+        const data = await response.json();
+        if (data.status === 'success') {
+          setPost(data.data);
+        } else {
+          throw new Error(data.message || 'Failed to load post details');
+        }
+      } catch (error) {
+        console.error('Error fetching post:', error);
+        toast({
+          title: "Error",
+          description: error instanceof Error ? error.message : "Failed to load post details",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-    // Find the post
-    const foundPost = mockHealthPosts.find(p => p.id === postId);
-    if (foundPost) {
-      setPost(foundPost);
+    if (id) {
+      fetchPost();
     }
-    setLoading(false);
-  }, [postId]);
+  }, [id]);
 
-  const handleLike = () => {
-    if (currentUser && post) {
-      likeMutation.mutate({ postId: post.id, userId: currentUser.id });
-    } else {
+  const handleLike = async () => {
+    if (!currentUser) {
       toast({
-        title: "Action required",
-        description: "Please log in to like posts",
-        variant: "destructive"
+        title: "Authentication Required",
+        description: "Please login to like posts",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(getApiUrl(`/api/v1/health-talks/${id}/like`), {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) throw new Error('Failed to like post');
+      
+      const data = await response.json();
+      if (data.status === 'success') {
+        // Update post data
+        setPost(prev => {
+          if (!prev) return prev;
+          const userLiked = prev.likes.some(like => like._id === currentUser.id);
+          const userInfo = {
+            _id: currentUser.id,
+            fullName: currentUser.fullName,
+            ...(currentUser.profileImage && { profileImage: currentUser.profileImage })
+          };
+          return {
+            ...prev,
+            likes: userLiked 
+              ? prev.likes.filter(like => like._id !== currentUser.id)
+              : [...prev.likes, userInfo]
+          };
+        });
+      }
+    } catch (error) {
+      console.error('Error liking post:', error);
+      toast({
+        title: "Error",
+        description: "Failed to like post",
+        variant: "destructive",
       });
     }
   };
 
-  const handleComment = () => {
-    if (!comment.trim() || !post) return;
+  const handleComment = async () => {
+    if (!comment.trim()) return;
     
-    if (currentUser) {
-      const commentData: CommentForm = {
-        postId: post.id, 
-        userId: currentUser.id,
-        content: comment
-      };
-      commentMutation.mutate(commentData);
-    } else {
+    if (!currentUser) {
       toast({
-        title: "Action required",
-        description: "Please log in to comment",
-        variant: "destructive"
+        title: "Authentication Required",
+        description: "Please login to comment",
+        variant: "destructive",
       });
+      return;
+    }
+
+    try {
+      setIsSubmittingComment(true);
+      const token = localStorage.getItem('token');
+      const response = await fetch(getApiUrl(`/api/v1/health-talks/${id}/comments`), {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text: comment }),
+      });
+
+      if (!response.ok) throw new Error('Failed to add comment');
+      
+      const data = await response.json();
+      if (data.status === 'success') {
+        // Clear comment input
+        setComment('');
+        
+        // Refresh post data to show new comment
+        const updatedPostResponse = await fetch(getApiUrl(`/api/v1/health-talks/${id}`));
+        const updatedPostData = await updatedPostResponse.json();
+        if (updatedPostData.status === 'success') {
+          setPost(updatedPostData.data);
+        }
+
+        toast({
+          title: "Success",
+          description: "Comment added successfully",
+        });
+      }
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add comment",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmittingComment(false);
     }
   };
 
   const handleConsultation = () => {
     if (currentUser && currentUser.role === 'patient' && post) {
       consultationMutation.mutate({ 
-        doctorId: post.doctor.id, 
+        doctorId: post.author._id, 
         patientId: currentUser.id,
-        postId: post.id
+        postId: post._id
       });
     } else if (!currentUser) {
       toast({
@@ -124,7 +260,8 @@ const HealthPostDetail = () => {
     }
   };
 
-  if (loading) {
+
+  if (isLoading) {
     return (
       <Layout>
         <div className="container mx-auto py-12 px-4 text-center">
@@ -156,175 +293,117 @@ const HealthPostDetail = () => {
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="mb-6">
           <Button variant="outline" onClick={() => navigate('/healthy-talk')}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Healthy Talk
           </Button>
         </div>
         
-        <article className="bg-white rounded-lg shadow-lg overflow-hidden">
-          {post.coverImage && (
-            <div className="w-full h-64 md:h-80 overflow-hidden">
+        <Card className="overflow-hidden">
+          {post.image && (
+            <div className="w-full h-[400px] relative">
               <img 
-                src={post.coverImage} 
-                alt={post.title} 
-                className="w-full h-full object-cover" 
+                src={post.image} 
+                alt={post.title}
+                className="w-full h-full object-cover"
               />
             </div>
           )}
           
-          <div className="p-6 md:p-8">
-            <h1 className="text-3xl md:text-4xl font-bold mb-4">{post.title}</h1>
-            
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center">
-                <Link to={`/doctor/${post.doctor.id}`} className="flex items-center gap-3 group">
-                  <Avatar className="h-12 w-12 border">
-                    <AvatarImage src={post.doctor.profileImage} alt={post.doctor.name} />
-                    <AvatarFallback>{post.doctor.name.charAt(0)}</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="font-medium group-hover:text-primary transition-colors">
-                      Dr. {post.doctor.name}
-                    </p>
-                    <p className="text-sm text-muted-foreground">{post.doctor.specialty}</p>
-                  </div>
-                </Link>
+          <div className="p-6 space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <Avatar>
+                  <AvatarImage src={post.author.profileImage} />
+                  <AvatarFallback>{post.author.fullName.charAt(0)}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="font-medium">Dr. {post.author.fullName}</p>
+                  <p className="text-sm text-gray-500">{post.author.specialty?.name || 'Healthcare Professional'}</p>
+                </div>
               </div>
-              
-              <div className="flex items-center text-sm text-muted-foreground">
-                <Calendar className="mr-1 h-4 w-4" />
-                <span className="mr-3">{format(new Date(post.publishedAt), 'MMM d, yyyy')}</span>
-                <Clock className="mr-1 h-4 w-4" />
-                <span>{post.readingTime} min read</span>
+              <div className="flex items-center text-sm text-gray-500">
+                <Calendar className="w-4 h-4 mr-1" />
+                {format(new Date(post.createdAt), 'MMM d, yyyy')}
               </div>
             </div>
             
-            <div className="prose max-w-none mb-8">
-              {post.content.split('\n').map((paragraph, index) => (
-                <p key={index} className="my-4">{paragraph}</p>
-              ))}
-            </div>
-            
-            {post.tags && post.tags.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-6">
-                {post.tags.map(tag => (
-                  <span key={tag} className="bg-accent px-3 py-1 text-sm rounded-full">
-                    {tag}
-                  </span>
+            <div>
+              <h1 className="text-3xl font-bold mb-4">{post.title}</h1>
+              <div className="flex flex-wrap gap-2 mb-4">
+                <Badge variant="secondary">{post.category}</Badge>
+                {post.tags[0].split(',').map((tag, index) => (
+                  <Badge key={index} variant="outline">{tag}</Badge>
                 ))}
               </div>
-            )}
+              <div className="prose max-w-none">
+                {post.content}
+              </div>
+            </div>
             
-            <div className="flex justify-between items-center border-t border-b py-4 my-6">
-              <div className="flex gap-6">
+            <div className="border-t pt-6">
+              <div className="flex items-center gap-4 mb-6">
                 <Button 
                   variant="ghost" 
-                  className="flex items-center gap-2"
+                  size="sm" 
+                  className="flex items-center gap-1"
                   onClick={handleLike}
                 >
                   <Heart 
-                    className={`h-5 w-5 ${post.likes.includes(currentUser?.id || '') ? 'fill-primary text-primary' : ''}`} 
+                    className={`h-4 w-4 ${
+                      post.likes.some(like => like._id === currentUser?.id)
+                        ? 'fill-primary text-primary' 
+                        : ''
+                    }`} 
                   />
-                  <span>{post.likes.length} likes</span>
+                  <span>{post.likes.length}</span>
                 </Button>
-                
-                <Button 
-                  variant="ghost" 
-                  className="flex items-center gap-2"
-                  onClick={() => document.getElementById('comment-box')?.focus()}
-                >
-                  <MessageSquare className="h-5 w-5" />
-                  <span>{post.comments.length} comments</span>
-                </Button>
-                
-                <Button 
-                  variant="ghost" 
-                  className="flex items-center gap-2"
-                >
-                  <Share className="h-5 w-5" />
-                  <span>Share</span>
-                </Button>
+                <div className="flex items-center gap-1 text-gray-500">
+                  <MessageSquare className="h-4 w-4" />
+                  <span>{post.comments.length} Comments</span>
+                </div>
               </div>
-              
-              {currentUser && currentUser.role === 'patient' && (
-                <Button 
-                  onClick={handleConsultation}
-                  disabled={consultationMutation.isPending}
-                >
-                  Request Consultation
-                </Button>
-              )}
-            </div>
-            
-            <div className="space-y-6">
-              <h3 className="text-xl font-semibold">Comments ({post.comments.length})</h3>
-              
-              {currentUser ? (
-                <div className="flex gap-4">
-                  <Avatar className="h-10 w-10">
-                    <AvatarImage src={currentUser.profileImage} alt={currentUser.name} />
-                    <AvatarFallback>{currentUser.name.charAt(0)}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <Textarea 
-                      id="comment-box"
-                      placeholder="Add a comment..." 
-                      className="mb-2"
-                      value={comment}
-                      onChange={(e) => setComment(e.target.value)}
-                    />
-                    <div className="flex justify-end">
-                      <Button 
-                        onClick={handleComment}
-                        disabled={!comment.trim() || commentMutation.isPending}
-                      >
-                        <Send className="h-4 w-4 mr-2" />
-                        Comment
-                      </Button>
-                    </div>
-                  </div>
+
+              <div className="space-y-4">
+                <h3 className="font-semibold">Comments</h3>
+                <div className="flex gap-2">
+                  <textarea
+                    className="flex-1 min-h-[100px] p-3 border rounded-lg resize-none"
+                    placeholder="Write a comment..."
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                  />
+                  <Button 
+                    className="self-start"
+                    onClick={handleComment}
+                    disabled={isSubmittingComment || !comment.trim()}
+                  >
+                    Post
+                  </Button>
                 </div>
-              ) : (
-                <div className="text-center p-4 bg-accent rounded-lg">
-                  <p>Please <Link to="/login" className="text-primary font-medium">log in</Link> to comment</p>
-                </div>
-              )}
-              
-              <Separator />
-              
-              {post.comments.length > 0 ? (
-                <div className="space-y-6">
-                  {post.comments.map(comment => (
-                    <div key={comment.id} className="flex gap-4">
-                      <Avatar className="h-10 w-10">
-                        <AvatarImage src={comment.user.profileImage} alt={comment.user.name} />
-                        <AvatarFallback>{comment.user.name.charAt(0)}</AvatarFallback>
+
+                <div className="space-y-4 mt-6">
+                  {post.comments.map((comment) => (
+                    <div key={comment._id} className="flex gap-3 p-4 bg-gray-50 rounded-lg">
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={comment.user.profileImage} />
+                        <AvatarFallback>{comment.user.fullName.charAt(0)}</AvatarFallback>
                       </Avatar>
-                      <div className="flex-1">
-                        <div className="flex justify-between">
-                          <p className="font-medium">{comment.user.name}</p>
-                          <span className="text-sm text-muted-foreground">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{comment.user.fullName}</span>
+                          <span className="text-sm text-gray-500">
                             {format(new Date(comment.createdAt), 'MMM d, yyyy')}
                           </span>
                         </div>
-                        <p className="mt-1">{comment.content}</p>
-                        <div className="mt-2">
-                          <Button variant="ghost" size="sm" className="h-6 px-2">
-                            <ThumbsUp className="h-3 w-3 mr-1" />
-                            <span className="text-xs">{comment.likes || 0}</span>
-                          </Button>
-                        </div>
+                        <p className="mt-1 text-gray-700">{comment.text}</p>
                       </div>
                     </div>
                   ))}
                 </div>
-              ) : (
-                <div className="text-center p-6">
-                  <p className="text-muted-foreground">No comments yet. Be the first to comment!</p>
-                </div>
-              )}
+              </div>
             </div>
           </div>
-        </article>
+        </Card>
       </div>
     </Layout>
   );

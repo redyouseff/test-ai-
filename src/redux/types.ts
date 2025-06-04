@@ -12,13 +12,24 @@ export const API_ENDPOINTS = {
 };
 
 // Types
+export interface Doctor {
+  _id: string;
+  fullName: string;
+  profileImage?: string;
+}
+
 export interface User {
   id: string;
-  name: string;
+  fullName: string;
+  name?: string;
   email: string;
-  specialty: string;
-  role: string;
+  specialty?: {
+    _id: string;
+    name: string;
+  };
+  role: 'patient' | 'doctor';
   profileImage?: string;
+  doctors?: Doctor[];
 }
 
 export interface AuthState {

@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { RootState } from '../../redux/types';
-import { logout } from '../../redux/actions/authActions';
+import { RootState, Doctor } from '../../redux/types';
+import { logout, AuthAction } from '../../redux/actions/authActions';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import {
@@ -26,10 +26,25 @@ import {
   Brain
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { Dispatch } from 'redux';
+
+interface NavigationItem {
+  path?: string;
+  label: string;
+  icon?: JSX.Element;
+  type?: 'dropdown';
+  items?: DropdownItem[];
+}
+
+interface DropdownItem {
+  label: string;
+  image?: string;
+  onClick: () => void;
+}
 
 export default function Header() {
   const { user } = useSelector((state: RootState) => state.auth);
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<Dispatch<AuthAction>>();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
@@ -45,19 +60,22 @@ export default function Header() {
   };
 
   // Both doctors and patients will have access to Healthy Talk
-  const navigationItems = user ? [
+  const navigationItems: NavigationItem[] = user ? [
     { path: '/dashboard', label: 'Dashboard', icon: <FileText className="h-4 w-4" /> },
     { path: '/appointments', label: 'Appointments', icon: <Calendar className="h-4 w-4" /> },
-    ...(user.role === 'patient' ? [{
-      type: 'dropdown',
-      label: 'My Doctors',
-      icon: <Users className="h-4 w-4" />,
-      items: user.doctors?.map((doctor: any) => ({
-        label: doctor.fullName,
-        image: doctor.profileImage,
-        onClick: () => navigate(`/doctor/${doctor._id}`)
-      })) || []
-    }] : []),
+    ...(user.role === 'patient' ? [
+      { path: '/messages', label: 'Messages', icon: <MessageSquare className="h-4 w-4" /> },
+      {
+        type: 'dropdown' as const,
+        label: 'My Doctors',
+        icon: <Users className="h-4 w-4" />,
+        items: user.doctors?.map((doctor: Doctor) => ({
+          label: doctor.fullName,
+          image: doctor.profileImage,
+          onClick: () => navigate(`/doctor/${doctor._id}`)
+        })) || []
+      }
+    ] : []),
     { path: '/healthy-talk', label: 'Healthy Talk', icon: <BookOpen className="h-4 w-4" /> },
     { path: '/profile', label: 'Profile', icon: <User className="h-4 w-4" /> },
     ...(user.role === 'doctor' ? [
@@ -71,7 +89,7 @@ export default function Header() {
 
   const isActive = (path: string) => location.pathname === path;
 
-  const renderNavigationItem = (item: any) => {
+  const renderNavigationItem = (item: NavigationItem) => {
     if (item.type === 'dropdown') {
       return (
         <DropdownMenu key={item.label}>
@@ -88,8 +106,8 @@ export default function Header() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-56">
-            {item.items.length > 0 ? (
-              item.items.map((subItem: any, index: number) => (
+            {item.items?.length > 0 ? (
+              item.items.map((subItem: DropdownItem, index: number) => (
                 <DropdownMenuItem 
                   key={index} 
                   onClick={subItem.onClick}
@@ -262,8 +280,8 @@ export default function Header() {
                       <span>{item.label}</span>
                     </div>
                     <div className="pl-6 space-y-2">
-                      {item.items.length > 0 ? (
-                        item.items.map((subItem: any, index: number) => (
+                      {item.items?.length > 0 ? (
+                        item.items.map((subItem: DropdownItem, index: number) => (
                           <Button
                             key={index}
                             variant="ghost"

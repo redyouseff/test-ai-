@@ -12,6 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import CreatePostDialog from '@/components/healthyTalk/CreatePostDialog';
 import { 
   Search, 
   PlusCircle, 
@@ -85,16 +86,46 @@ interface ApiResponse {
   }>;
 }
 
+// Add type for post data
+interface PostData {
+  _id: string;
+  title: string;
+  content: string;
+  createdAt?: string;
+  author: {
+    _id: string;
+    fullName?: string;
+    specialty?: {
+      name: string;
+    };
+  };
+  likes: string[];
+  comments: Array<{
+    _id: string;
+    user: {
+      _id: string;
+      fullName: string;
+      profileImage?: string;
+    };
+    text: string;
+    createdAt?: string;
+  }>;
+  tags: string[];
+  image?: string;
+  category: 'Articles' | 'Case Studies' | 'Research';
+}
+
 const HealthyTalk = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedFilter, setSelectedFilter] = useState<'articles' | 'case-studies' | 'research' | null>(null);
+  const [selectedFilter, setSelectedFilter] = useState<'Articles' | 'Case Studies' | 'Research' | null>(null);
   const [selectedSpecialty, setSelectedSpecialty] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [isCommenting, setIsCommenting] = useState<string | null>(null);
   const [comment, setComment] = useState('');
-  const itemsPerPage = 10;
+  const [itemsPerPage] = useState(10);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   const { user: currentUser } = useSelector((state: RootState) => state.auth);
   const authToken = useSelector((state: RootState) => state.auth.token);
@@ -102,8 +133,8 @@ const HealthyTalk = () => {
   // Add new state for optimistic likes
   const [optimisticLikes, setOptimisticLikes] = useState<{ [key: string]: boolean }>({});
 
-  // Fetch posts
-  const { data: healthPosts = [], isLoading: isLoadingPosts, error: postsError } = useQuery({
+  // Fetch posts with automatic refetch
+  const { data: healthPosts = [], isLoading: isLoadingPosts, error: postsError, refetch } = useQuery({
     queryKey: ['healthPosts', selectedSpecialty, selectedFilter],
     queryFn: async () => {
       try {
@@ -114,21 +145,21 @@ const HealthyTalk = () => {
         const response = await fetch(url.toString());
         if (!response.ok) throw new Error('Failed to fetch posts');
         
-        const data = await response.json() as ApiResponse;
-        return data.data.map((post) => ({
+        const data = await response.json();
+        return data.data.map((post: PostData) => ({
           id: post._id,
           title: post.title,
           content: post.content,
-          publishedAt: post.createdAt,
+          publishedAt: post.createdAt || new Date().toISOString(),
           doctor: {
             id: post.author._id,
-            name: post.author.fullName,
+            name: post.author.fullName || 'Unknown Author',
             specialty: post.author.specialty?.name || 'General',
             profileImage: undefined
           },
           likes: Array.isArray(post.likes) ? post.likes : [],
           comments: Array.isArray(post.comments) 
-            ? post.comments.map(comment => ({
+            ? post.comments.map((comment) => ({
                 id: comment._id,
                 postId: post._id,
                 user: {
@@ -137,26 +168,21 @@ const HealthyTalk = () => {
                   profileImage: comment.user.profileImage
                 },
                 content: comment.text,
-                createdAt: comment.createdAt,
+                createdAt: comment.createdAt || new Date().toISOString(),
                 likes: 0
               }))
             : [],
-          tags: Array.isArray(post.tags) 
-            ? post.tags.flatMap(tag => 
-                typeof tag === 'string' 
-                  ? tag.split(',').map(t => t.trim())
-                  : tag
-              )
-            : [],
+          tags: Array.isArray(post.tags) ? post.tags : [],
           coverImage: post.image,
           readingTime: Math.ceil(post.content.split(' ').length / 200),
-          category: post.category || 'articles'
+          category: post.category
         }));
       } catch (error) {
         console.error('Error fetching posts:', error);
         throw error;
       }
-    }
+    },
+    refetchOnWindowFocus: true
   });
 
   // Fetch specialties
@@ -304,7 +330,29 @@ const HealthyTalk = () => {
   );
 
   const handleCreatePost = () => {
-    navigate('/doctor-contributions');
+    if (!currentUser) {
+      toast({
+        title: "Authentication Required",
+        description: "Please login to create posts",
+        variant: "destructive"
+      });
+      return;
+    }
+    setShowCreateDialog(true);
+  };
+
+  const handlePostSuccess = () => {
+    // Close the dialog
+    setShowCreateDialog(false);
+    
+    // Refetch posts to show the new one
+    refetch();
+    
+    // Show success message
+    toast({
+      title: "Success",
+      description: "Post created successfully",
+    });
   };
 
   const handleSearch = () => {
@@ -367,12 +415,10 @@ const HealthyTalk = () => {
               />
             </div>
             <Button onClick={handleSearch}>Search</Button>
-            {currentUser && (
-              <Button onClick={handleCreatePost} className="flex items-center">
-                <PlusCircle className="h-4 w-4 mr-1" />
-                Create Post
-              </Button>
-            )}
+            <Button onClick={handleCreatePost} className="flex items-center gap-2">
+              <PlusCircle className="h-4 w-4" />
+              Create Post
+            </Button>
           </div>
         </div>
 
@@ -380,100 +426,63 @@ const HealthyTalk = () => {
           {/* Filters Section */}
           <div className="lg:col-span-3">
             <div className="space-y-6">
-              {/* Specialty Filter */}
+              {/* Category Filter */}
               <div className="bg-white rounded-lg p-6 shadow-sm border">
-                <h3 className="font-semibold text-lg mb-4">Filter by Specialty</h3>
+                <h3 className="font-semibold text-lg mb-4">Filter by Category</h3>
                 <div className="space-y-2">
                   <label className="flex items-center space-x-3 p-2 rounded-md hover:bg-accent cursor-pointer">
                     <input
                       type="radio"
-                      name="specialty"
+                      name="category"
                       value="all"
-                      checked={!selectedSpecialty}
-                      onChange={() => setSelectedSpecialty(null)}
+                      checked={!selectedFilter}
+                      onChange={() => setSelectedFilter(null)}
                       className="w-4 h-4 text-primary"
                     />
-                    <span>All Specialties</span>
+                    <span>All Categories</span>
                   </label>
                   
                   <label className="flex items-center space-x-3 p-2 rounded-md hover:bg-accent cursor-pointer">
                     <input
                       type="radio"
-                      name="specialty"
-                      value="cardiology"
-                      checked={selectedSpecialty === 'cardiology'}
-                      onChange={() => setSelectedSpecialty('cardiology')}
+                      name="category"
+                      value="Articles"
+                      checked={selectedFilter === 'Articles'}
+                      onChange={() => setSelectedFilter('Articles')}
                       className="w-4 h-4 text-primary"
                     />
-                    <span>Cardiology</span>
+                    <span>Articles</span>
                   </label>
                   
                   <label className="flex items-center space-x-3 p-2 rounded-md hover:bg-accent cursor-pointer">
                     <input
                       type="radio"
-                      name="specialty"
-                      value="skin-cancer"
-                      checked={selectedSpecialty === 'skin-cancer'}
-                      onChange={() => setSelectedSpecialty('skin-cancer')}
+                      name="category"
+                      value="Case Studies"
+                      checked={selectedFilter === 'Case Studies'}
+                      onChange={() => setSelectedFilter('Case Studies')}
                       className="w-4 h-4 text-primary"
                     />
-                    <span>Skin Cancer</span>
+                    <span>Case Studies</span>
                   </label>
                   
                   <label className="flex items-center space-x-3 p-2 rounded-md hover:bg-accent cursor-pointer">
                     <input
                       type="radio"
-                      name="specialty"
-                      value="chest-cancer"
-                      checked={selectedSpecialty === 'chest-cancer'}
-                      onChange={() => setSelectedSpecialty('chest-cancer')}
+                      name="category"
+                      value="Research"
+                      checked={selectedFilter === 'Research'}
+                      onChange={() => setSelectedFilter('Research')}
                       className="w-4 h-4 text-primary"
                     />
-                    <span>Chest Cancer</span>
+                    <span>Research</span>
                   </label>
                 </div>
               </div>
 
-              {/* Content Type Filter */}
-              <div className="space-y-2">
-                <button
-                  onClick={() => setSelectedFilter(selectedFilter === 'articles' ? null : 'articles')}
-                  className={`w-full text-left px-4 py-3 rounded-md transition-colors ${
-                    selectedFilter === 'articles' 
-                      ? 'bg-primary/10 text-primary font-medium' 
-                      : 'bg-white hover:bg-accent'
-                  }`}
-                >
-                  Articles
-                </button>
-                
-                <button
-                  onClick={() => setSelectedFilter(selectedFilter === 'case-studies' ? null : 'case-studies')}
-                  className={`w-full text-left px-4 py-3 rounded-md transition-colors ${
-                    selectedFilter === 'case-studies' 
-                      ? 'bg-primary/10 text-primary font-medium' 
-                      : 'bg-white hover:bg-accent'
-                  }`}
-                >
-                  Case Studies
-                </button>
-                
-                <button
-                  onClick={() => setSelectedFilter(selectedFilter === 'research' ? null : 'research')}
-                  className={`w-full text-left px-4 py-3 rounded-md transition-colors ${
-                    selectedFilter === 'research' 
-                      ? 'bg-primary/10 text-primary font-medium' 
-                      : 'bg-white hover:bg-accent'
-                  }`}
-                >
-                  Research
-                </button>
-              </div>
-
-              {/* Clear Filters Button */}
+              {/* Clear Filter Button */}
               <button
                 onClick={() => {
-                  setSelectedSpecialty(null);
                   setSelectedFilter(null);
                   setSearchTerm('');
                 }}
@@ -497,7 +506,7 @@ const HealthyTalk = () => {
               </div>
             ) : paginatedPosts.length > 0 ? (
               <>
-              <div className="space-y-8">
+                <div className="space-y-8">
                   {paginatedPosts.map((post) => (
                     <Card key={post.id} className="overflow-hidden transition-shadow duration-300 hover:shadow-lg">
                       <CardHeader className="pb-4">
@@ -662,11 +671,18 @@ const HealthyTalk = () => {
             ) : (
               <div className="text-center py-10 bg-accent rounded-lg">
                 <h3 className="font-semibold text-xl">No posts found</h3>
-                <p className="text-muted-foreground mt-2">Try adjusting your filters or search term</p>
+                <p className="text-muted-foreground mt-2">Try adjusting your filter</p>
               </div>
             )}
           </div>
         </div>
+
+        {/* Add CreatePostDialog */}
+        <CreatePostDialog 
+          isOpen={showCreateDialog}
+          onClose={() => setShowCreateDialog(false)}
+          onSuccess={handlePostSuccess}
+        />
       </div>
     </Layout>
   );

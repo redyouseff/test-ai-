@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Clock, MapPin } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { getApiUrl } from '@/api/config';
 import {
   Select,
   SelectContent,
@@ -203,34 +204,40 @@ const BookAppointment = () => {
       // Format the date to YYYY-MM-DD
       const formattedDate = format(selectedDate, 'yyyy-MM-dd');
 
-      const response = await axios.post(
-        'https://care-insight-api-9ed25d3ea3ea.herokuapp.com/api/v1/appointments',
-        {
-          doctor: doctorId, // Using the doctor's ID from the URL params
+      const response = await fetch(getApiUrl('/api/v1/appointments'), {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          doctor: doctorId,
           appointmentDate: formattedDate,
           reasonForVisit: reason,
           notes: notes || undefined // Only include notes if they exist
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
+        })
+      });
 
-      if (response.status === 201 || response.status === 200) {
+      if (!response.ok) {
+        throw new Error('Failed to book appointment');
+      }
+
+      const result = await response.json();
+
+      if (result.status === 'success') {
         toast({
           title: "Appointment Booked Successfully",
-          description: `Your appointment with Dr. ${doctor?.fullName} has been scheduled for ${format(selectedDate, 'MMMM dd, yyyy')} at ${formatTime(selectedTime)}.`,
+          description: `Your appointment has been scheduled for ${format(selectedDate, 'MMMM dd, yyyy')} at ${formatTime(selectedTime)}.`,
         });
-        navigate('/dashboard');
+        navigate('/appointments');
+      } else {
+        throw new Error(result.message || 'Failed to book appointment');
       }
     } catch (error) {
       console.error('Error booking appointment:', error);
       toast({
         title: "Error",
-        description: "Failed to book appointment. Please try again later.",
+        description: error instanceof Error ? error.message : "Failed to book appointment. Please try again later.",
         variant: "destructive",
       });
     }

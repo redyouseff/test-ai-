@@ -97,12 +97,11 @@ export const register = (userData: RegisterData) => async (dispatch: Dispatch) =
   }
 };
 
-export const logout = () => (dispatch: Dispatch) => {
-  // Remove token and user from localStorage
-  localStorage.removeItem('token');
-  localStorage.removeItem('user');
-  dispatch({ type: LOGOUT });
-};
+export const logout = () => ({
+  type: LOGOUT as const
+});
+
+export type AuthAction = ReturnType<typeof logout>;
 
 export const fetchProfile = () => async (dispatch: Dispatch, getState: any) => {
   try {

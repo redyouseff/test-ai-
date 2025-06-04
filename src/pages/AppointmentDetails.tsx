@@ -9,8 +9,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CalendarIcon, UserIcon, FileTextIcon, XIcon, CheckIcon, PlusIcon, Loader2 } from 'lucide-react';
+import { CalendarIcon, UserIcon, FileTextIcon, XIcon, CheckIcon, PlusIcon, Loader2, UploadIcon } from 'lucide-react';
 import { toast } from "@/components/ui/use-toast";
+import { getApiUrl } from '@/api/config';
 
 interface AppointmentDetails {
   _id: string;
@@ -109,6 +110,7 @@ const AppointmentDetails = () => {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [isDoctor, setIsDoctor] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   
   // Get user data from Redux store
   const { user } = useSelector((state: RootState) => state.auth);
@@ -125,6 +127,15 @@ const AppointmentDetails = () => {
       notes: ''
     }
   });
+
+  useEffect(() => {
+    // Simulated loading
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     // Get user data from localStorage
@@ -144,7 +155,7 @@ const AppointmentDetails = () => {
     const fetchAppointmentDetails = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`${API_BASE_URL}/api/v1/appointments/${id}`, {
+        const response = await fetch(getApiUrl(`/api/v1/appointments/${id}`), {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -158,8 +169,6 @@ const AppointmentDetails = () => {
         }
       } catch (error) {
         console.error('Error fetching appointment details:', error);
-      } finally {
-        setLoading(false);
       }
     };
 
@@ -172,7 +181,7 @@ const AppointmentDetails = () => {
     try {
       setIsCancelling(true);
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/api/v1/appointments/${id}/cancel`, {
+      const response = await fetch(getApiUrl(`/api/v1/appointments/${id}/cancel`), {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -232,7 +241,7 @@ const AppointmentDetails = () => {
   const handleComplete = async () => {
     try {
       const token = localStorage.getItem('token');
-      const completeUrl = `${API_BASE_URL}/api/v1/appointments/${id}/complete`;
+      const completeUrl = getApiUrl(`/api/v1/appointments/${id}/complete`);
       
       const requestBody = {
         diagnosis: completionDetails.diagnosis,
@@ -308,6 +317,79 @@ const AppointmentDetails = () => {
         recommendations
       }
     }));
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    try {
+      setIsUploading(true);
+      const token = localStorage.getItem('token');
+      const formData = new FormData();
+      
+      // Append each file to the FormData
+      for (let i = 0; i < files.length; i++) {
+        formData.append('files', files[i]);
+      }
+
+      const response = await fetch(getApiUrl(`/api/v1/appointments/${id}/upload`), {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to upload files');
+      }
+
+      const result = await response.json();
+
+      if (result.status === 'success') {
+        toast({
+          title: "Success",
+          description: "Files uploaded successfully",
+        });
+        
+        // Reload the page to show the new files
+        window.location.reload();
+      } else {
+        throw new Error(result.message || 'Failed to upload files');
+      }
+    } catch (error) {
+      console.error('Error uploading files:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to upload files",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDownload = async (fileUrl: string, fileName: string) => {
+    try {
+      const response = await fetch(fileUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      toast({
+        title: "Error",
+        description: "Failed to download file",
+        variant: "destructive",
+      });
+    }
   };
 
   if (loading) {
@@ -522,17 +604,54 @@ const AppointmentDetails = () => {
 
           {activeTab === 'files' && (
             <div className="p-6">
-              {appointment?.uploadedFiles && Array.isArray(appointment.uploadedFiles) && appointment.uploadedFiles.length > 0 ? (
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold mb-4">Uploaded Files ({appointment.uploadedFiles.length})</h3>
+              <div className="mb-6">
+                <div className="relative">
+                  <input
+                    type="file"
+                    id="file-upload"
+                    multiple
+                    className="hidden"
+                    onChange={handleFileUpload}
+                    disabled={isUploading}
+                  />
+                  <label
+                    htmlFor="file-upload"
+                    className={`flex flex-col items-center justify-center w-full h-48 px-4 transition bg-white border-2 border-gray-300 border-dashed rounded-lg hover:bg-gray-50 ${
+                      isUploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-primary'
+                    }`}
+                  >
+                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                      {isUploading ? (
+                        <>
+                          <Loader2 className="h-12 w-12 text-primary mb-3 animate-spin" />
+                          <p className="mb-2 text-xl font-semibold text-gray-700">Uploading...</p>
+                          <p className="text-sm text-gray-500">Please wait while your files are being uploaded</p>
+                        </>
+                      ) : (
+                        <>
+                          <UploadIcon className="h-12 w-12 text-gray-400 mb-3" />
+                          <p className="mb-2 text-xl font-semibold text-gray-700">Drop files here or click to upload</p>
+                          <p className="text-sm text-gray-500">Upload any relevant files (Images, Documents, etc.)</p>
+                        </>
+                      )}
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {appointment?.uploadedFiles && Array.isArray(appointment.uploadedFiles) && appointment.uploadedFiles.length > 0 && (
+                <div className="mt-8">
+                  <h3 className="text-lg font-semibold mb-4">
+                    Uploaded Files ({appointment.uploadedFiles.length})
+                  </h3>
                   <div className="grid gap-4">
                     {appointment.uploadedFiles.map((file) => (
                       <div 
                         key={file._id}
-                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
+                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors duration-200"
                       >
                         <div className="flex items-center space-x-4">
-                          <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center overflow-hidden">
+                          <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center overflow-hidden">
                             {file.fileType === "image/png" || file.fileType === "image/jpeg" || file.fileType === "image/jpg" ? (
                               <img 
                                 src={file.fileUrl} 
@@ -545,7 +664,7 @@ const AppointmentDetails = () => {
                                 }}
                               />
                             ) : (
-                              <FileTextIcon className="h-5 w-5 text-gray-500" />
+                              <FileTextIcon className="h-6 w-6 text-gray-500" />
                             )}
                           </div>
                           <div>
@@ -557,24 +676,38 @@ const AppointmentDetails = () => {
                             </p>
                           </div>
                         </div>
-                        <a
-                          href={file.fileUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                        <Button
+                          onClick={() => handleDownload(file.fileUrl, file.fileName.split('/').pop() || 'download')}
+                          className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors duration-200"
                         >
-                          View File
-                        </a>
+                          <svg 
+                            xmlns="http://www.w3.org/2000/svg" 
+                            className="h-4 w-4 mr-2" 
+                            fill="none" 
+                            viewBox="0 0 24 24" 
+                            stroke="currentColor"
+                          >
+                            <path 
+                              strokeLinecap="round" 
+                              strokeLinejoin="round" 
+                              strokeWidth={2} 
+                              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" 
+                            />
+                          </svg>
+                          Download File
+                        </Button>
                       </div>
                     ))}
                   </div>
                 </div>
-              ) : (
-                <div className="text-center py-12">
-                  <FileTextIcon className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-700">No Files Uploaded</h3>
-                  <p className="text-gray-500 mt-2">
-                    There are no files uploaded for this appointment.
+              )}
+
+              {(!appointment?.uploadedFiles || !Array.isArray(appointment.uploadedFiles) || appointment.uploadedFiles.length === 0) && (
+                <div className="text-center py-8">
+                  <FileTextIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-xl font-medium text-gray-700 mb-2">No Files Uploaded</h3>
+                  <p className="text-gray-500">
+                    Drag and drop files above or click to start uploading
                   </p>
                 </div>
               )}

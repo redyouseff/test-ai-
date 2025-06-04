@@ -3,10 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { RootState } from '../redux/types';
 import DashboardLayout from '../components/layout/DashboardLayout';
-import { Appointment } from '../types';
+import { Appointment, AppointmentApiResponse } from '../types/appointments';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Calendar, FileText } from 'lucide-react';
+import { Calendar } from 'lucide-react';
 import axios from 'axios';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -28,7 +28,7 @@ const Appointments = () => {
         throw new Error('No authentication token found');
       }
 
-      const response = await axios.get(
+      const response = await axios.get<AppointmentApiResponse>(
         `https://care-insight-api-9ed25d3ea3ea.herokuapp.com/api/v1/appointments?type=${type}`,
         {
           headers: {
@@ -37,7 +37,7 @@ const Appointments = () => {
         }
       );
 
-      if (response.status === 200) {
+      if (response.data.status === 'success') {
         if (type === 'upcoming') {
           setUpcomingAppointments(response.data.data.appointments);
         } else {
@@ -77,6 +77,39 @@ const Appointments = () => {
     setActiveTab(value);
   };
 
+  const renderAppointmentCard = (appointment: Appointment, isPast: boolean = false) => (
+    <div 
+      key={appointment._id} 
+      className={`bg-white p-6 rounded-lg shadow-sm ${isPast ? '' : 'hover:shadow-md'} transition-shadow border border-gray-100 cursor-pointer`}
+      onClick={() => navigate(`/appointment/${appointment._id}`)}
+    >
+      <div className="flex flex-col md:flex-row justify-between">
+        <div className="flex items-start space-x-4">
+          <div className={`w-12 h-12 rounded-full ${isPast ? 'bg-gray-100' : 'bg-primary-light'} flex items-center justify-center`}>
+            <Calendar size={20} className={isPast ? 'text-gray-500' : 'text-primary-dark'} />
+          </div>
+          <div>
+            <h3 className="font-semibold text-lg">
+              {currentUser?.role === 'patient' 
+                ? `Appointment with Dr. ${appointment.doctor.fullName}` 
+                : `Appointment with ${appointment.patient.fullName}`}
+            </h3>
+            <p className="text-gray-500">
+              {appointment.reasonForVisit}
+            </p>
+            <p className="text-gray-600 mt-2">{appointment.notes}</p>
+          </div>
+        </div>
+        
+        <div className="mt-4 md:mt-0 flex flex-col items-end">
+          <p className={isPast ? 'text-gray-500' : 'text-primary font-medium'}>
+            {formatDate(appointment.appointmentDate)}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -105,52 +138,7 @@ const Appointments = () => {
               </div>
             ) : upcomingAppointments.length > 0 ? (
               <div className="space-y-4">
-                {upcomingAppointments.map((appointment) => (
-                  <div 
-                    key={appointment._id} 
-                    className="bg-white p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-100 cursor-pointer"
-                    onClick={() => navigate(`/appointment/${appointment._id}`)}
-                  >
-                    <div className="flex flex-col md:flex-row justify-between">
-                      <div className="flex items-start space-x-4">
-                        <div className="w-12 h-12 rounded-full bg-primary-light flex items-center justify-center">
-                          <Calendar size={20} className="text-primary-dark" />
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-lg">
-                            {currentUser?.role === 'patient' 
-                              ? `Appointment with Dr. ${appointment.doctor?.fullName || appointment.doctor?.name}` 
-                              : `Appointment with ${appointment.patient?.fullName || appointment.patient?.name}`}
-                          </h3>
-                          <p className="text-gray-500">
-                            {appointment.reasonForVisit}
-                          </p>
-                          <p className="text-gray-600 mt-2">{appointment.notes}</p>
-                        </div>
-                      </div>
-                      
-                      <div className="mt-4 md:mt-0 flex flex-col items-end">
-                        <p className="text-primary font-medium">
-                          {formatDate(appointment.appointmentDate)}
-                        </p>
-                      </div>
-                    </div>
-
-                    {appointment.uploadedFiles && appointment.uploadedFiles.length > 0 && (
-                      <div className="mt-4 pt-4 border-t border-gray-100">
-                        <p className="text-sm font-medium text-gray-700">Uploaded Files:</p>
-                        <ul className="mt-2 text-sm text-gray-600">
-                          {appointment.uploadedFiles.map((file, index) => (
-                            <li key={index} className="flex items-center">
-                              <span className="w-1.5 h-1.5 rounded-full bg-primary-light mr-2"></span>
-                              {file}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                ))}
+                {upcomingAppointments.map((appointment) => renderAppointmentCard(appointment))}
               </div>
             ) : (
               <div className="text-center py-12">
@@ -180,38 +168,7 @@ const Appointments = () => {
               </div>
             ) : pastAppointments.length > 0 ? (
               <div className="space-y-4">
-                {pastAppointments.map((appointment) => (
-                  <div 
-                    key={appointment._id} 
-                    className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-shadow"
-                    onClick={() => navigate(`/appointment/${appointment._id}`)}
-                  >
-                    <div className="flex flex-col md:flex-row justify-between">
-                      <div className="flex items-start space-x-4">
-                        <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
-                          <Calendar size={20} className="text-gray-500" />
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-lg">
-                            {currentUser?.role === 'patient' 
-                              ? `Appointment with Dr. ${appointment.doctor?.fullName || appointment.doctor?.name}` 
-                              : `Appointment with ${appointment.patient?.fullName || appointment.patient?.name}`}
-                          </h3>
-                          <p className="text-gray-500">
-                            {appointment.reasonForVisit}
-                          </p>
-                          <p className="text-gray-600 mt-2">{appointment.notes}</p>
-                        </div>
-                      </div>
-                      
-                      <div className="mt-4 md:mt-0 text-right">
-                        <p className="text-gray-500">
-                          {formatDate(appointment.appointmentDate)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                {pastAppointments.map((appointment) => renderAppointmentCard(appointment, true))}
               </div>
             ) : (
               <div className="text-center py-12">
