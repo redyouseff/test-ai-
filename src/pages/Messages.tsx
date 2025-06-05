@@ -55,6 +55,9 @@ const Messages = () => {
   const location = useLocation();
   const pathDirectUserId = location.pathname.split('/message/')[1];
   const targetUserId = userId || pathDirectUserId || null;
+  const { state } = location;
+  const partnerFromState = state?.partner;
+  const appointmentFromState = state?.appointment;
 
   const [users, setUsers] = useState<User[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -64,7 +67,9 @@ const Messages = () => {
   const [selectedUser, setSelectedUser] = useState<string | null>(targetUserId);
   const [newMessage, setNewMessage] = useState('');
   const { toast } = useToast();
-  const [selectedUserDetails, setSelectedUserDetails] = useState<UserDetails | null>(null);
+  const [selectedUserDetails, setSelectedUserDetails] = useState<UserDetails | null>(
+    partnerFromState || null
+  );
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -82,6 +87,28 @@ const Messages = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    if (partnerFromState && targetUserId) {
+      setSelectedUser(targetUserId);
+      setSelectedUserDetails(partnerFromState);
+      
+      // If we have an appointment context, send an initial message about the appointment
+      if (appointmentFromState && !messages.length) {
+        const appointmentDate = new Date(appointmentFromState.appointmentDate);
+        const formattedDate = appointmentDate.toLocaleDateString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+        
+        setNewMessage(`Regarding our appointment on ${formattedDate} - ${appointmentFromState.reasonForVisit}`);
+      }
+    }
+  }, [partnerFromState, targetUserId, appointmentFromState]);
 
   const fetchUsers = async () => {
     try {

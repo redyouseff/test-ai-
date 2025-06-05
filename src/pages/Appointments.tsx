@@ -6,7 +6,7 @@ import DashboardLayout from '../components/layout/DashboardLayout';
 import { Appointment, AppointmentApiResponse } from '../types/appointments';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Calendar } from 'lucide-react';
+import { Calendar, MessageSquare } from 'lucide-react';
 import axios from 'axios';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -77,38 +77,67 @@ const Appointments = () => {
     setActiveTab(value);
   };
 
-  const renderAppointmentCard = (appointment: Appointment, isPast: boolean = false) => (
-    <div 
-      key={appointment._id} 
-      className={`bg-white p-6 rounded-lg shadow-sm ${isPast ? '' : 'hover:shadow-md'} transition-shadow border border-gray-100 cursor-pointer`}
-      onClick={() => navigate(`/appointment/${appointment._id}`)}
-    >
-      <div className="flex flex-col md:flex-row justify-between">
-        <div className="flex items-start space-x-4">
-          <div className={`w-12 h-12 rounded-full ${isPast ? 'bg-gray-100' : 'bg-primary-light'} flex items-center justify-center`}>
-            <Calendar size={20} className={isPast ? 'text-gray-500' : 'text-primary-dark'} />
+  const renderAppointmentCard = (appointment: Appointment, isPast: boolean = false) => {
+    const handleMessageClick = (e: React.MouseEvent) => {
+      e.stopPropagation(); // Prevent card click event
+      const chatPartnerId = currentUser?.role === 'patient' ? appointment.doctor._id : appointment.patient._id;
+      navigate(`/message/${chatPartnerId}`, {
+        state: {
+          partner: currentUser?.role === 'patient' ? appointment.doctor : appointment.patient,
+          appointment: appointment
+        }
+      });
+    };
+
+    return (
+      <div 
+        key={appointment._id} 
+        className={`bg-white p-6 rounded-lg shadow-sm ${isPast ? '' : 'hover:shadow-md'} transition-shadow border border-gray-100 cursor-pointer`}
+        onClick={() => navigate(`/appointment/${appointment._id}`)}
+      >
+        <div className="flex flex-col md:flex-row justify-between">
+          <div className="flex items-start space-x-4">
+            <div className={`w-12 h-12 rounded-full ${isPast ? 'bg-gray-100' : 'bg-primary-light'} flex items-center justify-center`}>
+              <Calendar size={20} className={isPast ? 'text-gray-500' : 'text-primary-dark'} />
+            </div>
+            <div>
+              <h3 className="font-semibold text-lg">
+                {currentUser?.role === 'patient' 
+                  ? `Appointment with Dr. ${appointment.doctor.fullName}` 
+                  : `Appointment with ${appointment.patient.fullName}`}
+              </h3>
+              <p className="text-gray-500">
+                {appointment.reasonForVisit}
+              </p>
+              <p className="text-gray-600 mt-2">{appointment.notes}</p>
+            </div>
           </div>
-          <div>
-            <h3 className="font-semibold text-lg">
-              {currentUser?.role === 'patient' 
-                ? `Appointment with Dr. ${appointment.doctor.fullName}` 
-                : `Appointment with ${appointment.patient.fullName}`}
-            </h3>
-            <p className="text-gray-500">
-              {appointment.reasonForVisit}
+          
+          <div className="mt-4 md:mt-0 flex flex-col items-end gap-2">
+            <p className={isPast ? 'text-gray-500' : 'text-primary font-medium'}>
+              {formatDate(appointment.appointmentDate)}
             </p>
-            <p className="text-gray-600 mt-2">{appointment.notes}</p>
+            {!isPast && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2 text-primary hover:text-white hover:bg-primary whitespace-nowrap"
+                onClick={handleMessageClick}
+              >
+                <MessageSquare className="h-4 w-4" />
+                <span>
+                  {currentUser?.role === 'patient' 
+                    ? 'Message Doctor'
+                    : 'Message Patient'
+                  }
+                </span>
+              </Button>
+            )}
           </div>
-        </div>
-        
-        <div className="mt-4 md:mt-0 flex flex-col items-end">
-          <p className={isPast ? 'text-gray-500' : 'text-primary font-medium'}>
-            {formatDate(appointment.appointmentDate)}
-          </p>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <DashboardLayout>

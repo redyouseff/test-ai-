@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -13,7 +14,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FileText, Image, File, Download, Brain, Sparkles, AlertCircle } from 'lucide-react';
+import { 
+  FileText, 
+  Image, 
+  File, 
+  Download, 
+  Brain, 
+  Sparkles, 
+  AlertCircle, 
+  User, 
+  Phone, 
+  Mail,
+  Calendar,
+  Activity,
+  Search,
+  PlusCircle
+} from 'lucide-react';
 import api from '../redux/api';
 
 interface PatientFile {
@@ -75,23 +91,14 @@ interface PatientData {
   medicalRecords: MedicalRecord[];
 }
 
-interface AIInsight {
-  type: 'diagnosis' | 'recommendation' | 'alert';
-  content: string;
-  confidence: number;
-}
-
 const PatientDetails = () => {
   const { patientId } = useParams();
   const [patientData, setPatientData] = useState<PatientData | null>(null);
   const [filesData, setFilesData] = useState<FilesResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState('all');
+  const [activeTab, setActiveTab] = useState('overview');
   const [searchTerm, setSearchTerm] = useState('');
-  const [aiQuery, setAiQuery] = useState('');
-  const [aiInsights, setAiInsights] = useState<AIInsight[]>([]);
-  const [isLoadingAI, setIsLoadingAI] = useState(false);
 
   const fetchFiles = async (filterBy: string = 'all') => {
     try {
@@ -148,65 +155,30 @@ const PatientDetails = () => {
     });
   };
 
-  // Mock AI insights - Replace this with actual API call
-  const generateAIInsights = async (query: string) => {
-    setIsLoadingAI(true);
+  // Add download function
+  const handleDownload = async (fileUrl: string, fileName: string) => {
     try {
-      // This would be replaced with an actual API call to your AI service
-      const mockInsights: AIInsight[] = [
-        {
-          type: 'diagnosis',
-          content: 'Based on the patient\'s symptoms and medical history, consider screening for cardiovascular complications due to long-term hypertension.',
-          confidence: 0.85
-        },
-        {
-          type: 'recommendation',
-          content: 'Recommend monthly blood pressure monitoring and quarterly HbA1c tests given the combination of hypertension and diabetes.',
-          confidence: 0.92
-        },
-        {
-          type: 'alert',
-          content: 'Potential drug interaction detected between current medications. Review insulin and captopril dosage.',
-          confidence: 0.78
-        }
-      ];
-      
-      setAiInsights(mockInsights);
+      const response = await fetch(fileUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Error generating AI insights:', error);
-    } finally {
-      setIsLoadingAI(false);
+      console.error('Error downloading file:', error);
+      // You can add a toast notification here to show error
     }
-  };
-
-  const handleAIQuery = () => {
-    if (aiQuery.trim()) {
-      generateAIInsights(aiQuery);
-    }
-  };
-
-  const getInsightIcon = (type: AIInsight['type']) => {
-    switch (type) {
-      case 'diagnosis':
-        return <Brain className="w-5 h-5 text-blue-500" />;
-      case 'recommendation':
-        return <Sparkles className="w-5 h-5 text-green-500" />;
-      case 'alert':
-        return <AlertCircle className="w-5 h-5 text-red-500" />;
-    }
-  };
-
-  const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 0.9) return 'text-green-600';
-    if (confidence >= 0.7) return 'text-yellow-600';
-    return 'text-red-600';
   };
 
   if (loading) {
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center min-h-screen">
-          <p>Loading patient data...</p>
+          <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
         </div>
       </DashboardLayout>
     );
@@ -216,7 +188,10 @@ const PatientDetails = () => {
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center min-h-screen">
-          <p className="text-red-500">{error || 'Patient data not found'}</p>
+          <div className="text-center">
+            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <p className="text-xl font-semibold text-red-500">{error || 'Patient data not found'}</p>
+          </div>
         </div>
       </DashboardLayout>
     );
@@ -224,202 +199,223 @@ const PatientDetails = () => {
 
   return (
     <DashboardLayout>
-      <div className="p-6 space-y-6 max-w-7xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold mb-2">Patient Details: {patientData?.personalInformation.fullName}</h1>
-          <p className="text-gray-500">View and manage patient information</p>
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* Header Section */}
+        <div className="bg-white rounded-xl shadow-sm border p-6 mb-6">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+                <User className="w-8 h-8 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">{patientData.personalInformation.fullName}</h1>
+                <div className="flex items-center gap-4 mt-2">
+                  <div className="flex items-center gap-2 text-gray-500">
+                    <Calendar className="w-4 h-4" />
+                    <span>{patientData.personalInformation.age} years</span>
+                  </div>
+                  <Badge variant="outline" className="capitalize">
+                    {patientData.personalInformation.gender}
+                  </Badge>
+                  <Badge variant="secondary">
+                    Blood Type: {patientData.personalInformation.bloodType}
+                  </Badge>
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col items-end gap-2">
+              <div className="flex items-center gap-2 text-gray-500">
+                <Mail className="w-4 h-4" />
+                <span>{patientData.contact.email}</span>
+              </div>
+              <div className="flex items-center gap-2 text-gray-500">
+                <Phone className="w-4 h-4" />
+                <span>{patientData.contact.phoneNumber}</span>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Patient Summary Card */}
-        <Card className="bg-white shadow-md">
-          <CardContent className="p-6">
-            <h2 className="text-xl font-semibold mb-4">Patient Summary</h2>
-            <div className="grid grid-cols-3 gap-8">
-              <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-2">Personal Information</h3>
-                <p className="text-gray-900">{patientData.personalInformation.age} years old, {patientData.personalInformation.gender}</p>
-                <p className="text-gray-900">{patientData.personalInformation.bloodType} blood type</p>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-2">Medical Condition</h3>
-                <p className="text-gray-900">{patientData.medicalCondition.currentCondition}</p>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {patientData.medicalCondition.chronicDiseases.map((disease, index) => (
-                    <Badge key={index} variant="secondary">{disease}</Badge>
-                  ))}
-                </div>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {patientData.medicalCondition.currentMedications.map((medication, index) => (
-                    <Badge key={index} variant="outline">{medication}</Badge>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-gray-500 mb-2">Contact</h3>
-                <p className="text-gray-900">{patientData.contact.email}</p>
-                <p className="text-gray-900">{patientData.contact.phoneNumber}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Main Content */}
+        <Tabs defaultValue="overview" className="space-y-6">
+          <TabsList className="bg-white border-b rounded-none w-full justify-start h-12 p-0 space-x-8">
+            <TabsTrigger 
+              value="overview"
+              className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none rounded-none h-12"
+            >
+              Overview
+            </TabsTrigger>
+            <TabsTrigger 
+              value="records"
+              className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none rounded-none h-12"
+            >
+              Medical Records
+            </TabsTrigger>
+            <TabsTrigger 
+              value="files"
+              className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none rounded-none h-12"
+            >
+              Files & Documents
+            </TabsTrigger>
+          </TabsList>
 
-       
-
-        {/* Medical Records Section */}
-        <Card className="bg-white shadow-md">
-          <CardHeader>
-            <CardTitle>Medical Records History</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              {patientData.medicalRecords.map((record) => (
-                <div key={record.id} className="border rounded-lg p-4 space-y-4">
-                  <div className="flex justify-between items-start">
+          {/* Overview Tab */}
+          <TabsContent value="overview" className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Current Medical Status */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                    <Activity className="w-5 h-5 text-primary" />
+                    Current Medical Status
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
                     <div>
-                      <h3 className="font-medium">Diagnosis</h3>
-                      <p className="text-gray-600">{record.diagnosis}</p>
+                      <h3 className="text-sm font-medium text-gray-500 mb-1">Current Condition</h3>
+                      <p className="text-gray-900">{patientData.medicalCondition.currentCondition}</p>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm text-gray-500">{formatDate(record.date)}</p>
-                      <p className="text-sm font-medium">{record.doctor.name}</p>
-                    </div>
-                  </div>
-
-                  {record.treatment.medications.length > 0 && (
                     <div>
-                      <h4 className="font-medium mb-2">Prescribed Medications</h4>
-                      <div className="space-y-2">
-                        {record.treatment.medications.map((medication) => (
-                          <div key={medication._id} className="bg-gray-50 p-3 rounded">
-                            <p className="font-medium">{medication.name}</p>
-                            <p className="text-sm text-gray-600">
-                              {medication.dosage} - {medication.frequency} for {medication.duration}
-                            </p>
-                          </div>
+                      <h3 className="text-sm font-medium text-gray-500 mb-2">Chronic Diseases</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {patientData.medicalCondition.chronicDiseases.map((disease, index) => (
+                          <Badge key={index} variant="secondary">{disease}</Badge>
                         ))}
                       </div>
                     </div>
-                  )}
+                  </div>
+                </CardContent>
+              </Card>
 
-                  {record.treatment.recommendations.length > 0 && (
-                    <div>
-                      <h4 className="font-medium mb-2">Recommendations</h4>
-                      <ul className="list-disc list-inside text-gray-600">
-                        {record.treatment.recommendations.map((recommendation, index) => (
-                          <li key={index}>{recommendation}</li>
-                        ))}
-                      </ul>
+              {/* Current Medications */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-primary" />
+                    Current Medications
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {patientData.medicalCondition.currentMedications.map((medication, index) => (
+                      <div key={index} className="p-3 bg-gray-50 rounded-lg">
+                        <p className="text-gray-900">{medication}</p>
+                      </div>
+                    ))}
+                    {patientData.medicalCondition.currentMedications.length === 0 && (
+                      <p className="text-gray-500 text-center py-4">No current medications</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Medical Records Tab */}
+          <TabsContent value="records" className="space-y-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-semibold">Medical Records History</h2>
+              <Button>
+                <PlusCircle className="w-4 h-4 mr-2" />
+                Add New Record
+              </Button>
+            </div>
+            <div className="space-y-4">
+              {patientData.medicalRecords.map((record) => (
+                <Card key={record.id}>
+                  <CardContent className="p-6">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h3 className="font-semibold text-lg mb-1">{record.diagnosis}</h3>
+                        <p className="text-gray-500 text-sm">
+                          Dr. {record.doctor.name} - {record.doctor.specialty}
+                        </p>
+                      </div>
+                      <Badge variant="outline">{formatDate(record.date)}</Badge>
                     </div>
-                  )}
-                </div>
+                    <div className="space-y-4">
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-500 mb-2">Medications</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {record.treatment.medications.map((medication) => (
+                            <div key={medication._id} className="p-3 bg-gray-50 rounded-lg">
+                              <p className="font-medium">{medication.name}</p>
+                              <p className="text-sm text-gray-500">
+                                {medication.dosage} - {medication.frequency}
+                              </p>
+                              <p className="text-sm text-gray-500">Duration: {medication.duration}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-500 mb-2">Recommendations</h4>
+                        <ul className="list-disc list-inside space-y-1 text-gray-600">
+                          {record.treatment.recommendations.map((rec, index) => (
+                            <li key={index}>{rec}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
             </div>
-          </CardContent>
-        </Card>
+          </TabsContent>
 
-        {/* File Management Section */}
-        <Card className="bg-white shadow-md">
-          <CardHeader>
-            <CardTitle>File Management</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {/* Search and Filter */}
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex-1">
-                  <Input 
-                    type="text" 
-                    placeholder="Search files by name..." 
-                    className="w-full"
+          {/* Files Tab */}
+          <TabsContent value="files" className="space-y-6">
+            <div className="flex justify-between items-center gap-4 mb-6">
+              <div className="flex-1 max-w-md">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <Input
+                    placeholder="Search files..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
                   />
                 </div>
-                <Select 
-                  value={activeTab}
-                  onValueChange={handleTabChange}
-                >
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="All File Types" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All File Types ({filesData?.counts.all || 0})</SelectItem>
-                    <SelectItem value="images">Images ({filesData?.counts.images || 0})</SelectItem>
-                    <SelectItem value="documents">Documents ({filesData?.counts.documents || 0})</SelectItem>
-                    <SelectItem value="other">Other ({filesData?.counts.other || 0})</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
-
-              {/* File Type Tabs */}
-              <div className="flex gap-4 border-b">
-                <button
-                  className={`pb-2 px-1 ${
-                    activeTab === 'all'
-                      ? 'border-b-2 border-primary text-primary font-medium'
-                      : 'text-gray-500'
-                  }`}
-                  onClick={() => handleTabChange('all')}
-                >
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => handleTabChange('all')}>
                   All Files ({filesData?.counts.all || 0})
-                </button>
-                <button
-                  className={`pb-2 px-1 ${
-                    activeTab === 'images'
-                      ? 'border-b-2 border-primary text-primary font-medium'
-                      : 'text-gray-500'
-                  }`}
-                  onClick={() => handleTabChange('images')}
-                >
+                </Button>
+                <Button variant="outline" onClick={() => handleTabChange('images')}>
                   Images ({filesData?.counts.images || 0})
-                </button>
-                <button
-                  className={`pb-2 px-1 ${
-                    activeTab === 'documents'
-                      ? 'border-b-2 border-primary text-primary font-medium'
-                      : 'text-gray-500'
-                  }`}
-                  onClick={() => handleTabChange('documents')}
-                >
+                </Button>
+                <Button variant="outline" onClick={() => handleTabChange('documents')}>
                   Documents ({filesData?.counts.documents || 0})
-                </button>
-                <button
-                  className={`pb-2 px-1 ${
-                    activeTab === 'other'
-                      ? 'border-b-2 border-primary text-primary font-medium'
-                      : 'text-gray-500'
-                  }`}
-                  onClick={() => handleTabChange('other')}
-                >
-                  Other ({filesData?.counts.other || 0})
-                </button>
-              </div>
-
-              {/* Files Grid */}
-              <div className="grid grid-cols-3 gap-4">
-                {filteredFiles.map((file) => (
-                  <div key={file.id} className="bg-gray-50 rounded-lg p-4 flex items-center justify-between group">
-                    <div className="flex items-center gap-3">
-                      {getFileIcon(file.type)}
-                      <div>
-                        <p className="font-medium">{file.name}</p>
-                        <p className="text-sm text-gray-500">{formatDate(new Date().toISOString())}</p>
-                      </div>
-                    </div>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="opacity-0 group-hover:opacity-100"
-                      onClick={() => window.open(file.url, '_blank')}
-                    >
-                      <Download className="w-4 h-4" />
-                    </Button>
-                  </div>
-                ))}
+                </Button>
               </div>
             </div>
-          </CardContent>
-        </Card>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredFiles.map((file) => (
+                <Card key={file.id} className="hover:bg-gray-50 transition-colors">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                        {getFileIcon(file.type)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-900 truncate">{file.name}</p>
+                        <p className="text-sm text-gray-500 capitalize">{file.type}</p>
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={() => handleDownload(file.url, file.name)}
+                      >
+                        <Download className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </DashboardLayout>
   );

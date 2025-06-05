@@ -12,7 +12,7 @@ import ConnectedUsers from '@/components/dashboard/ConnectedUsers';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from '@/components/ui/button';
-import { FileText } from 'lucide-react';
+import { FileText, User as UserIcon, Star, StarHalf, Download, File, FileImage, Trash2, Calendar } from 'lucide-react';
 import { fetchProfile } from '../redux/actions/authActions';
 import api from '../redux/api';
 
@@ -121,6 +121,24 @@ const Dashboard = () => {
     return new Date(dateString).toLocaleDateString('en-US', options);
   };
 
+  // Add helper function to get file icon
+  const getFileIcon = (fileName: string) => {
+    const extension = fileName.split('.').pop()?.toLowerCase();
+    switch (extension) {
+      case 'pdf':
+        return <FileText className="w-10 h-10 text-red-500" />;
+      case 'doc':
+      case 'docx':
+        return <File className="w-10 h-10 text-blue-500" />;
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+        return <FileImage className="w-10 h-10 text-green-500" />;
+      default:
+        return <FileText className="w-10 h-10 text-gray-400" />;
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -140,15 +158,34 @@ const Dashboard = () => {
   return (
     <DashboardLayout>
       <div className="space-y-8">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Welcome, {currentUser.fullName}
-          </h1>
-          <p className="text-gray-600">
-            {currentUser.role === 'patient' 
-              ? 'Manage your appointments and health information.' 
-              : 'Manage your patient appointments and consultations.'}
-          </p>
+        {/* Header Section */}
+        <div className="bg-gradient-to-r from-primary/10 to-primary/5 rounded-xl p-8 border shadow-sm">
+          <div className="flex items-center gap-6">
+            <div className="w-20 h-20 rounded-full bg-white shadow-md flex items-center justify-center border-4 border-white">
+              {currentUser.profileImage ? (
+                <img 
+                  src={currentUser.profileImage} 
+                  alt={currentUser.fullName}
+                  className="w-full h-full rounded-full object-cover" 
+                />
+              ) : (
+                <span className="text-3xl font-bold text-primary">
+                  {currentUser.fullName.charAt(0)}
+                </span>
+              )}
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                Welcome back, {currentUser.fullName}
+              </h1>
+              <p className="text-gray-600 text-lg flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-primary" />
+                {currentUser.role === 'patient' 
+                  ? 'Manage your appointments and health information' 
+                  : 'Manage your patient appointments and consultations'}
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Overview Cards */}
@@ -160,279 +197,190 @@ const Dashboard = () => {
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
+          {/* Main Content - Left Side */}
+          <div className="lg:col-span-2 space-y-6">
             {/* Upcoming Appointments */}
             {statistics?.upcomingAppointmentsList && (
-              <Card className="border-0 shadow-none">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-0">
-                  <CardTitle className="text-xl font-semibold">Upcoming Appointments</CardTitle>
+              <Card className="border shadow-sm">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <div>
+                    <CardTitle className="text-xl font-semibold">Upcoming Appointments</CardTitle>
+                    <p className="text-sm text-gray-500 mt-1">Your scheduled appointments</p>
+                  </div>
                   <Button 
-                    variant="ghost" 
-                    className="text-primary hover:text-primary/90"
+                    variant="outline"
+                    className="text-primary border-primary hover:bg-primary hover:text-white"
                     onClick={() => navigate('/appointments')}
                   >
                     View All
                   </Button>
                 </CardHeader>
-                <CardContent className="px-0">
-                  <div className="space-y-3">
-                    {statistics.upcomingAppointmentsList.map((appointment) => (
-                      <div 
-                        key={appointment.id}
-                        className="flex items-center justify-between p-4 bg-white rounded-lg border hover:bg-gray-50/50 cursor-pointer"
-                        onClick={() => navigate(`/appointment/${appointment.id}`)}
-                      >
-                        <div className="space-y-2">
-                          <p className="text-primary font-medium">{appointment.reasonForVisit}</p>
-                          <div className="space-y-1">
-                            <p className="text-gray-900 font-medium">{appointment.fullName}</p>
-                            <p className="text-gray-500 text-sm">{appointment.clinicLocation}</p>
+                <CardContent>
+                  <div className="space-y-4">
+                    {statistics.upcomingAppointmentsList.length === 0 ? (
+                      <div className="text-center py-8">
+                        <p className="text-gray-500">No upcoming appointments</p>
+                      </div>
+                    ) : (
+                      statistics.upcomingAppointmentsList.map((appointment) => (
+                        <div 
+                          key={appointment.id}
+                          className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                          onClick={() => navigate(`/appointment/${appointment.id}`)}
+                        >
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
+                                {appointment.status}
+                              </Badge>
+                              <span className="text-sm text-gray-500">
+                                {new Date(appointment.date).toLocaleDateString('en-US', {
+                                  weekday: 'short',
+                                  month: 'short',
+                                  day: 'numeric'
+                                })}
+                              </span>
+                            </div>
+                            <p className="font-medium text-gray-900">{appointment.reasonForVisit}</p>
+                            <div className="flex items-center gap-2 text-sm text-gray-500">
+                              <span>{appointment.fullName}</span>
+                              <span>•</span>
+                              <span>{appointment.clinicLocation}</span>
+                            </div>
                           </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-gray-900 font-medium mb-1">
-                            {new Date(appointment.date).toLocaleDateString('en-US', {
-                              weekday: 'short',
-                              month: 'short',
-                              day: 'numeric',
+                          <div className="text-right text-sm text-gray-500">
+                            {new Date(appointment.date).toLocaleTimeString('en-US', {
                               hour: '2-digit',
                               minute: '2-digit',
                               hour12: true
                             })}
-                          </p>
-                          <Badge 
-                            variant={appointment.status === 'pending' ? 'secondary' : 'default'}
-                            className={`${
-                              appointment.status === 'pending' 
-                                ? 'bg-blue-100 text-blue-800 hover:bg-blue-100' 
-                                : appointment.status === 'completed'
-                                ? 'bg-purple-100 text-purple-800 hover:bg-purple-100'
-                                : ''
-                            }`}
-                          >
-                            {appointment.status}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Connected Doctors/Patients */}
-            <div className="mt-6">
-              {currentUser.role === 'patient' ? (
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-md font-medium">Your Doctors</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {currentUser.doctors && currentUser.doctors.length > 0 ? (
-                        currentUser.doctors.map((doctor) => (
-                          <div 
-                            key={doctor._id}
-                            className="flex items-center space-x-4 p-3 hover:bg-gray-50 rounded-lg cursor-pointer"
-                            onClick={() => navigate(`/doctor/${doctor._id}`)}
-                          >
-                            <div className="flex-shrink-0">
-                              {doctor.profileImage ? (
-                                <img 
-                                  src={doctor.profileImage} 
-                                  alt={doctor.fullName}
-                                  className="w-12 h-12 rounded-full object-cover"
-                                />
-                              ) : (
-                                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                                  <span className="text-primary text-lg font-semibold">
-                                    {doctor.fullName.charAt(0)}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-900 truncate">
-                                {doctor.fullName}
-                              </p>
-                              <p className="text-sm text-gray-500 truncate">
-                                {doctor.email}
-                              </p>
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-center py-6">
-                          <p className="text-gray-500">No doctors assigned yet</p>
-                          <Button 
-                            variant="outline"
-                            className="mt-2"
-                            onClick={() => navigate('/find-doctor')}
-                          >
-                            Find a Doctor
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ) : (
-                <ConnectedUsers 
-                  users={connectedUsers} 
-                  currentUserRole={currentUser.role} 
-                />
-              )}
-            </div>
-
-            {/* Recent Files */}
-            {currentUser.role === 'patient' && statistics?.recentFiles.length > 0 && (
-              <Card className="mt-6">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-md font-medium">Recent Files</CardTitle>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="text-sm font-medium"
-                    onClick={() => navigate('/medical-records')}
-                  >
-                    View All Files
-                  </Button>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {statistics.recentFiles.slice(0, 3).map((file) => (
-                      <div 
-                        key={file.id} 
-                        className="flex items-center justify-between p-2 hover:bg-gray-50 rounded"
-                      >
-                        <div className="flex items-center">
-                          <FileText className="h-9 w-9 p-2 rounded bg-gray-100 text-gray-700 mr-3" />
-                          <div>
-                            <p className="text-sm font-medium">{file.fileName}</p>
-                            <p className="text-xs text-gray-500">{formatDate(file.uploadDate)}</p>
                           </div>
                         </div>
-                        <Badge variant="outline" className="text-xs">
-                          {file.fileType ? file.fileType.split('/')[0] : 'Unknown'}
-                        </Badge>
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </div>
                 </CardContent>
               </Card>
             )}
           </div>
 
-          <div>
-            {/* Patient Medical Summary */}
-            {currentUser.role === 'patient' && (
-              <Card>
+          {/* Sidebar - Right Side */}
+          <div className="space-y-6">
+            {/* Connected Users Section */}
+            {currentUser.role === 'doctor' ? (
+              <Card className="border shadow-sm">
                 <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle>Medical Summary</CardTitle>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="text-sm font-medium"
-                      onClick={() => navigate('/medical-records')}
-                    >
-                      View Records
-                    </Button>
-                  </div>
+                  <CardTitle className="text-xl font-semibold">Your Patients</CardTitle>
+                  <p className="text-sm text-gray-500">List of patients under your care</p>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-500">Blood Type</h3>
-                      <p className="text-lg font-semibold">
-                        {(currentUser as PatientProfile).bloodType || 'Not recorded'}
-                      </p>
-                    </div>
-                    
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-500">Medications</h3>
-                      {(currentUser as PatientProfile).medications && 
-                       (currentUser as PatientProfile).medications!.length > 0 ? (
-                        <div className="flex flex-wrap gap-2 mt-1">
-                          {(currentUser as PatientProfile).medications!.map((med, index) => (
-                            <Badge key={index} variant="outline">{med}</Badge>
-                          ))}
+                  {currentUser.patients && currentUser.patients.length > 0 ? (
+                    <div className="space-y-4">
+                      {currentUser.patients.map((patient) => (
+                        <div 
+                          key={patient._id}
+                          className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer"
+                          onClick={() => navigate(`/patient/${patient._id}`)}
+                        >
+                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                            {patient.profileImage ? (
+                              <img 
+                                src={patient.profileImage} 
+                                alt={patient.fullName}
+                                className="w-full h-full rounded-full object-cover" 
+                              />
+                            ) : (
+                              <span className="text-sm font-medium text-primary">
+                                {patient.fullName.charAt(0)}
+                              </span>
+                            )}
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-900">{patient.fullName}</p>
+                            <p className="text-sm text-gray-500">{patient.email}</p>
+                          </div>
                         </div>
-                      ) : (
-                        <p className="text-gray-600">No medications recorded</p>
-                      )}
+                      ))}
                     </div>
-                    
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-500">Chronic Diseases</h3>
-                      {(currentUser as PatientProfile).chronicDiseases && 
-                       (currentUser as PatientProfile).chronicDiseases!.length > 0 ? (
-                        <div className="flex flex-wrap gap-2 mt-1">
-                          {(currentUser as PatientProfile).chronicDiseases!.map((disease, index) => (
-                            <Badge key={index} variant="secondary">{disease}</Badge>
-                          ))}
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-gray-500">No patients yet</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="border shadow-sm">
+                <CardHeader>
+                  <CardTitle className="text-xl font-semibold">Your Doctors</CardTitle>
+                  <p className="text-sm text-gray-500">Healthcare providers managing your care</p>
+                </CardHeader>
+                <CardContent>
+                  {currentUser.doctors && currentUser.doctors.length > 0 ? (
+                    <div className="space-y-4">
+                      {currentUser.doctors.map((doctor) => (
+                        <div 
+                          key={doctor._id}
+                          className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer"
+                          onClick={() => navigate(`/doctor/${doctor._id}`)}
+                        >
+                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                            {doctor.profileImage ? (
+                              <img 
+                                src={doctor.profileImage} 
+                                alt={doctor.fullName}
+                                className="w-full h-full rounded-full object-cover" 
+                              />
+                            ) : (
+                              <span className="text-sm font-medium text-primary">
+                                {doctor.fullName.charAt(0)}
+                              </span>
+                            )}
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-900">{doctor.fullName}</p>
+                            <p className="text-sm text-gray-500">{doctor.email}</p>
+                          </div>
                         </div>
-                      ) : (
-                        <p className="text-gray-600">None reported</p>
-                      )}
+                      ))}
                     </div>
-                  </div>
-                </CardContent>  
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-gray-500">No doctors assigned yet</p>
+                    </div>
+                  )}
+                </CardContent>
               </Card>
             )}
 
-            {/* Patient list for doctors */}
-            {currentUser.role === 'doctor' && (
-              <Card>
+            {/* Your Files Section */}
+            {statistics?.recentFiles && (
+              <Card className="border shadow-sm">
                 <CardHeader>
-                  <CardTitle>Your Patients</CardTitle>
+                  <CardTitle className="text-xl font-semibold">Your Files</CardTitle>
+                  <p className="text-sm text-gray-500">Recently uploaded documents</p>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-2">
-                    {currentUser.patients && currentUser.patients.length > 0 ? (
-                      currentUser.patients.map((patient) => (
+                  <div className="space-y-3">
+                    {statistics.recentFiles.length === 0 ? (
+                      <div className="text-center py-6">
+                        <FileText className="w-10 h-10 text-gray-400 mx-auto mb-2" />
+                        <p className="text-gray-500">No files available</p>
+                      </div>
+                    ) : (
+                      statistics.recentFiles.map((file) => (
                         <div 
-                          key={patient._id} 
-                          className="flex items-center justify-between p-3 hover:bg-gray-50 rounded cursor-pointer"
-                          onClick={() => navigate(`/patient/${patient._id}`)}
+                          key={file.id}
+                          className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer"
                         >
-                          <div className="flex items-center">
-                            <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mr-3">
-                              {patient.profileImage ? (
-                                <img 
-                                  src={patient.profileImage}
-                                  alt={patient.fullName}
-                                  className="w-10 h-10 rounded-full object-cover"
-                                />
-                              ) : (
-                                <span className="font-medium text-gray-700">
-                                  {patient.fullName.charAt(0)}
-                                </span>
-                              )}
-                            </div>
-                            <div>
-                              <p className="font-medium">{patient.fullName}</p>
-                              <p className="text-xs text-gray-500">
-                                {patient.medicalCondition || 'No medical condition recorded'}
-                              </p>
-                            </div>
+                          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                            {getFileIcon(file.fileName)}
                           </div>
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigate(`/patient/${patient._id}`);
-                            }}
-                          >
-                            View Details
-                          </Button>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-gray-900 truncate">{file.fileName}</p>
+                          </div>
                         </div>
                       ))
-                    ) : (
-                      <div className="text-center py-6">
-                        <p className="text-gray-500">You have no patients yet.</p>
-                      </div>
                     )}
                   </div>
                 </CardContent>
