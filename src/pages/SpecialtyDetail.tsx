@@ -1,14 +1,29 @@
-import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { useSelector } from 'react-redux';
-import { RootState } from '../redux/types';
-import Layout from '../components/layout/Layout';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { useSelector } from "react-redux";
+import { RootState } from "../redux/types";
+import Layout from "../components/layout/Layout";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Calendar, Star, User, MessageCircle, Loader2 } from 'lucide-react';
-import axios from 'axios';
+import {
+  Calendar,
+  Star,
+  User,
+  MessageCircle,
+  Loader2,
+  Clock,
+  ArrowRight,
+} from "lucide-react";
+import axios from "axios";
 import { useToast } from "@/components/ui/use-toast";
-import MessageButton from '@/components/common/MessageButton';
+import MessageButton from "@/components/common/MessageButton";
 
 interface WorkingHours {
   day: string;
@@ -95,11 +110,14 @@ const SpecialtyDetail = () => {
           setDoctors(doctorsResponse.data.users || []);
         }
       } catch (error) {
-        console.error('Error fetching data:', error);
-        setError("Failed to load specialty information. Please try again later.");
+        console.error("Error fetching data:", error);
+        setError(
+          "Failed to load specialty information. Please try again later."
+        );
         toast({
           title: "Error",
-          description: "Failed to load specialty information. Please try again later.",
+          description:
+            "Failed to load specialty information. Please try again later.",
           variant: "destructive",
         });
       } finally {
@@ -114,19 +132,23 @@ const SpecialtyDetail = () => {
     if (currentUser) {
       navigate(`/book-appointment/${doctorId}`);
     } else {
-      navigate('/login', { state: { redirectTo: `/book-appointment/${doctorId}` } });
+      navigate("/login", {
+        state: { redirectTo: `/book-appointment/${doctorId}` },
+      });
     }
   };
-  
+
   const handleViewProfile = (doctorId: string) => {
     navigate(`/doctor/${doctorId}`);
   };
-  
+
   const handleStartChat = (doctorId: string) => {
     if (currentUser) {
       navigate(`/messages?doctorId=${doctorId}`);
     } else {
-      navigate('/login', { state: { redirectTo: `/messages?doctorId=${doctorId}` } });
+      navigate("/login", {
+        state: { redirectTo: `/messages?doctorId=${doctorId}` },
+      });
     }
   };
 
@@ -151,11 +173,13 @@ const SpecialtyDetail = () => {
             {error || "Specialty Not Found"}
           </h1>
           <p className="mb-8">
-            {error ? "An error occurred while loading the specialty." : "The specialty you are looking for does not exist."}
+            {error
+              ? "An error occurred while loading the specialty."
+              : "The specialty you are looking for does not exist."}
           </p>
-          <Button 
+          <Button
             className="bg-primary hover:bg-primary-dark text-white"
-            onClick={() => navigate('/specialties')}
+            onClick={() => navigate("/specialties")}
           >
             Back to Specialties
           </Button>
@@ -166,171 +190,310 @@ const SpecialtyDetail = () => {
 
   return (
     <Layout>
-      <div className="container mx-auto py-12 px-4">
-        {/* Specialty Header */}
-        <div className="mb-12 text-center">
-          <div className="w-48 h-48 mx-auto mb-8 rounded-full overflow-hidden shadow-lg">
-            <img 
-              src={specialty.imageCover}
-              alt={specialty.name}
-              className="w-full h-full object-cover"
-            />
+      {/* Hero Section with Parallax Effect */}
+      <div className="relative min-h-[400px] bg-gradient-to-br from-primary/90 to-primary flex items-center">
+        <div
+          className="absolute inset-0 opacity-10"
+          style={{
+            backgroundImage: `url(${specialty.imageCover})`,
+            backgroundPosition: "center",
+            backgroundSize: "cover",
+            backgroundRepeat: "no-repeat",
+          }}
+        />
+        <div className="container mx-auto px-4 py-16 relative z-10">
+          <div className="max-w-3xl">
+            <h1 className="text-4xl md:text-5xl font-bold text-white mb-6">
+              {specialty.name}
+            </h1>
+            <p className="text-lg text-white/90 mb-8">
+              {specialty.description}
+            </p>
+            <div className="flex flex-wrap gap-4">
+              <div className="bg-white/10 backdrop-blur-sm rounded-lg px-6 py-3 text-white">
+                <div className="text-2xl font-bold">{doctors.length}</div>
+                <div className="text-sm opacity-90">Specialists</div>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm rounded-lg px-6 py-3 text-white">
+                <div className="text-2xl font-bold">24/7</div>
+                <div className="text-sm opacity-90">Support</div>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm rounded-lg px-6 py-3 text-white">
+                <div className="text-2xl font-bold">4.8</div>
+                <div className="text-sm opacity-90">Rating</div>
+              </div>
+            </div>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">{specialty.name}</h1>
-          <p className="text-gray-600 max-w-2xl mx-auto">
-            {specialty.description}
-          </p>
+        </div>
+      </div>
+
+      <div className="container mx-auto px-4 py-12">
+        {/* Quick Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 -mt-20 mb-12">
+          <div className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-all duration-300 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-[100%] group-hover:bg-primary/10 transition-colors duration-300" />
+            <div className="relative">
+              <div className="flex items-start gap-4">
+                <div className="shrink-0">
+                  <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Calendar className="w-6 h-6 text-primary" />
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold mb-1 text-gray-900">
+                    Book Appointment
+                  </h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Schedule a visit with our specialists
+                  </p>
+                  <Button
+                    variant="ghost"
+                    className="text-primary p-0 h-auto font-medium hover:text-primary/90 hover:bg-transparent"
+                    onClick={() =>
+                      doctors &&
+                      doctors.length > 0 &&
+                      handleBookAppointment(doctors[0]._id)
+                    }
+                  >
+                    Book Now
+                    <ArrowRight className="w-4 h-4 ml-1 transition-transform group-hover:translate-x-1" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-all duration-300 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-[100%] group-hover:bg-primary/10 transition-colors duration-300" />
+            <div className="relative">
+              <div className="flex items-start gap-4">
+                <div className="shrink-0">
+                  <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <MessageCircle className="w-6 h-6 text-primary" />
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold mb-1 text-gray-900">
+                    Online Consultation
+                  </h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Chat with our doctors online
+                  </p>
+                  <Button
+                    variant="ghost"
+                    className="text-primary p-0 h-auto font-medium hover:text-primary/90 hover:bg-transparent"
+                    onClick={() =>
+                      doctors &&
+                      doctors.length > 0 &&
+                      handleStartChat(doctors[0]._id)
+                    }
+                  >
+                    Start Chat
+                    <ArrowRight className="w-4 h-4 ml-1 transition-transform group-hover:translate-x-1" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-all duration-300 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-[100%] group-hover:bg-primary/10 transition-colors duration-300" />
+            <div className="relative">
+              <div className="flex items-start gap-4">
+                <div className="shrink-0">
+                  <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <User className="w-6 h-6 text-primary" />
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold mb-1 text-gray-900">
+                    View Profiles
+                  </h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Learn more about our doctors
+                  </p>
+                  <Button
+                    variant="ghost"
+                    className="text-primary p-0 h-auto font-medium hover:text-primary/90 hover:bg-transparent"
+                    onClick={() =>
+                      doctors &&
+                      doctors.length > 0 &&
+                      handleViewProfile(doctors[0]._id)
+                    }
+                  >
+                    View All
+                    <ArrowRight className="w-4 h-4 ml-1 transition-transform group-hover:translate-x-1" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Doctors List */}
-        <div className="mb-12">
-          <h2 className="text-2xl font-bold mb-6">Our {specialty.name} Specialists</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Doctors Section */}
+        <div className="mb-16">
+          <div className="flex justify-between items-center mb-8">
+            <h2 className="text-2xl font-bold">
+              Our {specialty.name} Specialists
+            </h2>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm">
+                Filter
+              </Button>
+              <Button variant="outline" size="sm">
+                Sort By
+              </Button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {doctors && doctors.length > 0 ? (
               doctors.map((doctor) => (
-                <Card key={doctor._id} className="hover:shadow-md transition-all">
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start">
-                      <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mr-4">
-                        {doctor.profileImage ? (
-                          <img 
-                            src={doctor.profileImage} 
-                            alt={doctor.fullName} 
-                            className="w-full h-full rounded-full object-cover" 
-                          />
-                        ) : (
-                          <User size={32} className="text-gray-500" />
+                <Card
+                  key={doctor._id}
+                  className="group hover:shadow-xl transition-all duration-300 border-0 shadow-md bg-white overflow-hidden"
+                >
+                  <div className="flex flex-col md:flex-row">
+                    {/* Doctor Image Section */}
+                    <div className="md:w-48 p-6 flex items-center justify-center bg-gradient-to-br from-primary/5 to-primary/10">
+                      <div className="relative">
+                        <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-white shadow-lg">
+                          {doctor.profileImage ? (
+                            <img
+                              src={doctor.profileImage}
+                              alt={doctor.fullName}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-primary/5 flex items-center justify-center">
+                              <User size={40} className="text-primary/40" />
+                            </div>
+                          )}
+                        </div>
+                        {doctor.averageRating > 0 && (
+                          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-white shadow-lg rounded-full px-3 py-1 flex items-center gap-1">
+                            <Star
+                              size={14}
+                              className="text-amber-500 fill-current"
+                            />
+                            <span className="font-semibold text-sm">
+                              {doctor.averageRating}
+                            </span>
+                          </div>
                         )}
                       </div>
-                      <div>
-                        <CardTitle className="text-lg">{doctor.fullName}</CardTitle>
-                        <CardDescription className="flex items-center mt-1">
-                          {doctor.averageRating > 0 && (
-                            <>
-                              <span className="flex items-center text-amber-500">
-                                <Star size={14} className="fill-current" />
-                                <span className="ml-1">{doctor.averageRating}</span>
-                              </span>
-                              <span className="mx-2">•</span>
-                            </>
+                    </div>
+
+                    {/* Doctor Info Section */}
+                    <div className="flex-1 p-6">
+                      <div className="mb-4">
+                        <h3 className="text-xl font-bold mb-1">
+                          {doctor.fullName}
+                        </h3>
+                        <p className="text-sm text-gray-600 flex items-center gap-2">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/5 text-primary">
+                            {specialty.name} Specialist
+                          </span>
+                          {doctor.numberOfReviews > 0 && (
+                            <span className="text-gray-500">
+                              {doctor.numberOfReviews} reviews
+                            </span>
                           )}
-                          <span>{doctor.numberOfReviews} reviews</span>
-                        </CardDescription>
+                        </p>
                       </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pt-4">
-                    <p className="text-sm text-gray-600 mb-2">
-                      {doctor.clinicLocation}
-                    </p>
-                    {doctor.certifications && doctor.certifications.length > 0 && (
-                      <div className="mt-4">
-                        <h4 className="font-medium text-sm">Certifications:</h4>
-                        <ul className="text-sm text-gray-600 mt-1">
-                          {doctor.certifications.map((cert, index) => (
-                            <li key={index} className="inline-flex items-center mr-4">
-                              <span className="w-1.5 h-1.5 rounded-full bg-primary-light mr-1"></span>
-                              {cert}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {doctor.workingHours && doctor.workingHours.length > 0 && (
-                      <div className="mt-4">
-                        <h4 className="font-medium text-sm">Working Hours:</h4>
-                        <div className="text-sm text-gray-600 mt-1">
-                          {doctor.workingHours
-                            .filter(hours => hours.from && hours.to)
-                            .map((hours, index) => (
-                              <p key={index}>
-                                {hours.day}: {hours.from} - {hours.to}
-                              </p>
-                            ))}
+
+                      <div className="space-y-3 mb-6">
+                        <div className="flex items-center text-gray-600">
+                          <Calendar className="w-4 h-4 mr-2 text-primary/60" />
+                          <span className="text-sm">
+                            {doctor.clinicLocation}
+                          </span>
                         </div>
+
+                        {doctor.workingHours &&
+                          doctor.workingHours.length > 0 && (
+                            <div className="flex items-start">
+                              <Clock className="w-4 h-4 mr-2 mt-1 text-primary/60" />
+                              <div className="flex-1">
+                                <div className="grid grid-cols-2 gap-2">
+                                  {doctor.workingHours
+                                    .filter((hours) => hours.from && hours.to)
+                                    .map((hours, index) => (
+                                      <div
+                                        key={index}
+                                        className="text-sm text-gray-600"
+                                      >
+                                        <span className="font-medium">
+                                          {hours.day}:
+                                        </span>
+                                        <span className="ml-1">
+                                          {hours.from} - {hours.to}
+                                        </span>
+                                      </div>
+                                    ))}
+                                </div>
+                              </div>
+                            </div>
+                          )}
                       </div>
-                    )}
-                  </CardContent>
-                  <CardFooter className="pt-2 pb-4 flex flex-wrap items-center gap-1.5">
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="default"
-                        size="sm"
-                        className="bg-primary text-white"
-                        onClick={() => navigate(`/book-appointment/${doctor._id}`)}
-                      >
-                        Book Appointment
-                      </Button>
-                      <MessageButton 
-                        userId={doctor._id}
-                        variant="outline"
-                        size="sm"
-                        showIcon={true}
-                      />
+
+                      {doctor.certifications &&
+                        doctor.certifications.length > 0 && (
+                          <div className="mb-6">
+                            <div className="flex flex-wrap gap-2">
+                              {doctor.certifications.map((cert, index) => (
+                                <span
+                                  key={index}
+                                  className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800"
+                                >
+                                  {cert}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                      <div className="flex items-center gap-3">
+                        <Button
+                          className="flex-1 bg-primary hover:bg-primary-dark text-white"
+                          onClick={() => handleBookAppointment(doctor._id)}
+                        >
+                          Book Appointment
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => handleViewProfile(doctor._id)}
+                        >
+                          View Profile
+                        </Button>
+                        <MessageButton
+                          userId={doctor._id}
+                          showIcon={true}
+                          variant="outline"
+                          size="icon"
+                          className="w-10 h-10"
+                        />
+                      </div>
                     </div>
-                    <Button 
-                      variant="outline"
-                      className="flex-1 h-8 text-sm px-3 flex items-center justify-center rounded-full"
-                      onClick={() => handleViewProfile(doctor._id)}
-                    >
-                      <span className="w-4 h-4 rounded-full bg-gray-100 flex items-center justify-center mr-1.5">
-                        <User className="h-2.5 w-2.5" />
-                      </span>
-                      Profile
-                    </Button>
-                    <Button 
-                      variant="ghost"
-                      className="w-7 h-7 p-0 rounded-full flex items-center justify-center"
-                      onClick={() => handleStartChat(doctor._id)}
-                    >
-                      <span className="w-4 h-4 rounded-full bg-gray-100 flex items-center justify-center">
-                        <MessageCircle className="h-2.5 w-2.5" />
-                      </span>
-                    </Button>
-                  </CardFooter>
+                  </div>
                 </Card>
               ))
             ) : (
-              <div className="col-span-3 text-center py-12 bg-gray-50 rounded-lg">
-                <User size={48} className="mx-auto text-gray-400 mb-4" />
-                <h3 className="text-xl font-semibold mb-2">No Doctors Available</h3>
-                <p className="text-gray-500">There are currently no doctors available for this specialty.</p>
+              <div className="col-span-full bg-gray-50 rounded-xl p-12 text-center">
+                <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <User size={32} className="text-gray-400" />
+                </div>
+                <h3 className="text-xl font-semibold mb-2">
+                  No Doctors Available
+                </h3>
+                <p className="text-gray-500 max-w-md mx-auto">
+                  We currently don't have any specialists available in this
+                  department. Please check back later or contact us for more
+                  information.
+                </p>
               </div>
             )}
-          </div>
-        </div>
-
-        {/* About Section */}
-        <div className="bg-accent rounded-lg p-8">
-          <h2 className="text-2xl font-bold mb-6">About {specialty.name}</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div>
-              <h3 className="text-lg font-semibold mb-3">What is {specialty.name}?</h3>
-              <p className="text-gray-700 mb-4">{specialty.description}</p>
-              <div className="mt-6">
-                <Button 
-                  className="bg-primary hover:bg-primary-dark text-white"
-                  onClick={() => doctors && doctors.length > 0 && handleBookAppointment(doctors[0]._id)}
-                  disabled={!doctors || doctors.length === 0}
-                >
-                  Book a Consultation
-                </Button>
-              </div>
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold mb-3">Our Approach</h3>
-              <p className="text-gray-700 mb-4">
-                Our {specialty.name} department combines clinical expertise with advanced AI diagnostic technology to provide comprehensive care. We offer:
-              </p>
-              <ul className="list-disc pl-5 text-gray-700">
-                <li>Specialized diagnostic imaging</li>
-                <li>AI-powered early detection</li>
-                <li>Multidisciplinary treatment planning</li>
-                <li>Minimally invasive treatment options</li>
-                <li>Ongoing monitoring and follow-up care</li>
-                <li>Support services for patients and families</li>
-              </ul>
-            </div>
           </div>
         </div>
       </div>

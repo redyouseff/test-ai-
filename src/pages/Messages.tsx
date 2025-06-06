@@ -1,17 +1,17 @@
-import { useEffect, useState, useRef } from 'react';
-import { useParams, useLocation } from 'react-router-dom';
-import { io, Socket } from 'socket.io-client';
-import DashboardLayout from '../components/layout/DashboardLayout';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { SearchIcon, SendIcon, ImageIcon } from 'lucide-react';
-import { useToast } from '@/components/ui/use-toast';
+import { useEffect, useState, useRef } from "react";
+import { useParams, useLocation } from "react-router-dom";
+import { io, Socket } from "socket.io-client";
+import DashboardLayout from "../components/layout/DashboardLayout";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { SearchIcon, SendIcon, ImageIcon } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
 
-const API_BASE_URL = 'https://care-insight-api-9ed25d3ea3ea.herokuapp.com';
-const SOCKET_URL = 'https://care-insight-api-9ed25d3ea3ea.herokuapp.com';
+const API_BASE_URL = "https://care-insight-api-9ed25d3ea3ea.herokuapp.com";
+const SOCKET_URL = "https://care-insight-api-9ed25d3ea3ea.herokuapp.com";
 
 interface User {
   _id: string;
@@ -53,7 +53,7 @@ interface UserData {
 const Messages = () => {
   const { userId } = useParams();
   const location = useLocation();
-  const pathDirectUserId = location.pathname.split('/message/')[1];
+  const pathDirectUserId = location.pathname.split("/message/")[1];
   const targetUserId = userId || pathDirectUserId || null;
   const { state } = location;
   const partnerFromState = state?.partner;
@@ -63,24 +63,23 @@ const Messages = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedUser, setSelectedUser] = useState<string | null>(targetUserId);
-  const [newMessage, setNewMessage] = useState('');
+  const [newMessage, setNewMessage] = useState("");
   const { toast } = useToast();
-  const [selectedUserDetails, setSelectedUserDetails] = useState<UserDetails | null>(
-    partnerFromState || null
-  );
+  const [selectedUserDetails, setSelectedUserDetails] =
+    useState<UserDetails | null>(partnerFromState || null);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const [socket, setSocket] = useState<Socket | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
-  const currentUserId = localStorage.getItem('userId');
+  const currentUserId = localStorage.getItem("userId");
   const [currentUserData, setCurrentUserData] = useState<User | null>(null);
 
   const scrollToBottom = () => {
     if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   };
 
@@ -92,20 +91,22 @@ const Messages = () => {
     if (partnerFromState && targetUserId) {
       setSelectedUser(targetUserId);
       setSelectedUserDetails(partnerFromState);
-      
+
       // If we have an appointment context, send an initial message about the appointment
       if (appointmentFromState && !messages.length) {
         const appointmentDate = new Date(appointmentFromState.appointmentDate);
-        const formattedDate = appointmentDate.toLocaleDateString('en-US', {
-          weekday: 'long',
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
+        const formattedDate = appointmentDate.toLocaleDateString("en-US", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
         });
-        
-        setNewMessage(`Regarding our appointment on ${formattedDate} - ${appointmentFromState.reasonForVisit}`);
+
+        setNewMessage(
+          `Regarding our appointment on ${formattedDate} - ${appointmentFromState.reasonForVisit}`
+        );
       }
     }
   }, [partnerFromState, targetUserId, appointmentFromState]);
@@ -113,36 +114,45 @@ const Messages = () => {
   const fetchUsers = async () => {
     try {
       setLoadingUsers(true);
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       const response = await fetch(`${API_BASE_URL}/api/v1/message/users`, {
-        method: 'GET',
+        method: "GET",
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+        credentials: "include",
       });
 
       if (!response.ok) {
-        throw new Error('Failed to fetch users');
+        throw new Error("Failed to fetch users");
       }
 
       const data = await response.json();
-      const currentUserId = localStorage.getItem('userId');
-      const filteredUsers = data.filter((user: User) => user._id !== currentUserId);
-      
+      const currentUserId = localStorage.getItem("userId");
+      const filteredUsers = data.filter(
+        (user: User) => user._id !== currentUserId
+      );
+
       const sortedUsers = filteredUsers.sort((a: User, b: User) => {
-        const dateA = a.lastMessage?.createdAt ? new Date(a.lastMessage.createdAt) : new Date(0);
-        const dateB = b.lastMessage?.createdAt ? new Date(b.lastMessage.createdAt) : new Date(0);
+        const dateA = a.lastMessage?.createdAt
+          ? new Date(a.lastMessage.createdAt)
+          : new Date(0);
+        const dateB = b.lastMessage?.createdAt
+          ? new Date(b.lastMessage.createdAt)
+          : new Date(0);
         return dateB.getTime() - dateA.getTime();
       });
-      
+
       setUsers(sortedUsers);
     } catch (error) {
-      console.error('Error fetching users:', error);
+      console.error("Error fetching users:", error);
       toast({
         title: "Error",
         description: "Failed to load users. Please try again.",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setLoadingUsers(false);
@@ -151,20 +161,22 @@ const Messages = () => {
 
   const fetchMessages = async (userId: string) => {
     if (!userId) {
-      console.warn('No userId provided to fetchMessages');
+      console.warn("No userId provided to fetchMessages");
       return;
     }
 
-    console.log('Fetching messages for user:', userId);
     try {
       setLoadingMessages(true);
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       const response = await fetch(`${API_BASE_URL}/api/v1/message/${userId}`, {
-        method: 'GET',
+        method: "GET",
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+        credentials: "include",
       });
 
       if (!response.ok) {
@@ -172,15 +184,14 @@ const Messages = () => {
       }
 
       const messages = await response.json();
-      console.log('Fetched messages:', messages);
       setMessages(messages);
       scrollToBottom();
     } catch (error) {
-      console.error('Error fetching messages:', error);
+      console.error("Error fetching messages:", error);
       toast({
         title: "Error",
         description: "Failed to load messages. Please try again.",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setLoadingMessages(false);
@@ -189,65 +200,68 @@ const Messages = () => {
 
   const fetchSelectedUserDetails = async (userId: string) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       const response = await fetch(`${API_BASE_URL}/api/v1/users/${userId}`, {
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
       });
 
       if (response.ok) {
         const data = await response.json();
-        if (data.status === 'success') {
+        if (data.status === "success") {
           setSelectedUserDetails(data.data.user);
         }
       }
     } catch (error) {
-      console.error('Error fetching user details:', error);
+      console.error("Error fetching user details:", error);
     }
   };
 
   useEffect(() => {
     if (!currentUserId) {
-      console.log('No currentUserId found');
+      console.log("No currentUserId found");
       return;
     }
 
-    console.log('Attempting to connect to socket with userId:', currentUserId);
+    console.log("Attempting to connect to socket with userId:", currentUserId);
     const newSocket = io(SOCKET_URL, {
       query: { userId: currentUserId },
       withCredentials: true,
-      transports: ['websocket'],
+      transports: ["websocket"],
       reconnection: true,
-      reconnectionAttempts: 5
+      reconnectionAttempts: 5,
+      extraHeaders: {
+        "Access-Control-Allow-Origin": "*",
+      },
     });
 
-    newSocket.on('connect', () => {
-      console.log('Socket connected successfully. Socket ID:', newSocket.id);
+    newSocket.on("connect", () => {
+      console.log("Socket connected successfully. Socket ID:", newSocket.id);
     });
 
-    newSocket.on('connect_error', (error) => {
-      console.error('Socket connection error:', error);
+    newSocket.on("connect_error", (error) => {
+      console.error("Socket connection error:", error);
     });
 
-    newSocket.on('disconnect', (reason) => {
-      console.log('Socket disconnected. Reason:', reason);
+    newSocket.on("disconnect", (reason) => {
+      console.log("Socket disconnected. Reason:", reason);
     });
 
-    newSocket.on('receiveMessage', (newMessage: Message) => {
-      console.log('Received new message:', newMessage);
-      console.log('Current selected user:', selectedUser);
-      console.log('Current user ID:', currentUserId);
-      
-      setMessages(prev => {
-        console.log('Previous messages:', prev);
-        const messageExists = prev.some(msg => msg._id === newMessage._id);
+    newSocket.on("receiveMessage", (newMessage: Message) => {
+      console.log("Received new message:", newMessage);
+      console.log("Current selected user:", selectedUser);
+      console.log("Current user ID:", currentUserId);
+
+      setMessages((prev) => {
+        console.log("Previous messages:", prev);
+        const messageExists = prev.some((msg) => msg._id === newMessage._id);
         if (messageExists) {
-          console.log('Message already exists in state');
+          console.log("Message already exists in state");
           return prev;
         }
-        console.log('Adding new message to state');
+        console.log("Adding new message to state");
         return [...prev, newMessage];
       });
 
@@ -255,14 +269,14 @@ const Messages = () => {
       scrollToBottom();
     });
 
-    newSocket.on('onlineUsers', (users: string[]) => {
+    newSocket.on("onlineUsers", (users: string[]) => {
       setOnlineUsers(users);
     });
 
     setSocket(newSocket);
 
     return () => {
-      console.log('Cleaning up socket connection');
+      console.log("Cleaning up socket connection");
       if (newSocket) {
         newSocket.disconnect();
       }
@@ -271,104 +285,112 @@ const Messages = () => {
 
   const formatMessageDate = (dateString: string) => {
     try {
-      if (!dateString) return '';
-      
+      if (!dateString) return "";
+
       const date = new Date(dateString);
-      if (isNaN(date.getTime())) return '';
-      
+      if (isNaN(date.getTime())) return "";
+
       const now = new Date();
       const yesterday = new Date(now);
       yesterday.setDate(yesterday.getDate() - 1);
-      
+
       const timeOptions: Intl.DateTimeFormatOptions = {
-        hour: 'numeric',
-        minute: 'numeric',
-        hour12: true
+        hour: "numeric",
+        minute: "numeric",
+        hour12: true,
       };
 
       if (date.toDateString() === now.toDateString()) {
-        return new Intl.DateTimeFormat('ar', timeOptions).format(date);
+        return new Intl.DateTimeFormat("ar", timeOptions).format(date);
       }
-      
+
       if (date.toDateString() === yesterday.toDateString()) {
-        return `الأمس ${new Intl.DateTimeFormat('ar', timeOptions).format(date)}`;
+        return `الأمس ${new Intl.DateTimeFormat("ar", timeOptions).format(
+          date
+        )}`;
       }
-      
-      return new Intl.DateTimeFormat('ar', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: 'numeric',
-        hour12: true
+
+      return new Intl.DateTimeFormat("ar", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        hour: "numeric",
+        minute: "numeric",
+        hour12: true,
       }).format(date);
     } catch (error) {
-      console.error('Date formatting error:', error);
-      return '';
+      console.error("Date formatting error:", error);
+      return "";
     }
   };
 
   const sendMessage = async () => {
     if (!selectedUser || (!newMessage.trim() && !selectedImage)) {
-      console.log('Invalid send message attempt:', { selectedUser, newMessage, selectedImage });
+      console.log("Invalid send message attempt:", {
+        selectedUser,
+        newMessage,
+        selectedImage,
+      });
       return;
     }
 
-    console.log('Attempting to send message to:', selectedUser);
-    const token = localStorage.getItem('token');
+    console.log("Attempting to send message to:", selectedUser);
+    const token = localStorage.getItem("token");
     const messageText = newMessage.trim();
-    
-    setNewMessage('');
+
+    setNewMessage("");
     setSelectedImage(null);
 
     try {
       const formData = new FormData();
-      
+
       if (messageText) {
-        formData.append('text', messageText);
-      }
-      
-      if (selectedImage) {
-        formData.append('image', selectedImage);
+        formData.append("text", messageText);
       }
 
-      console.log('Sending message request...');
-      const response = await fetch(`${API_BASE_URL}/api/v1/message/${selectedUser}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-        body: formData
-      });
+      if (selectedImage) {
+        formData.append("image", selectedImage);
+      }
+
+      console.log("Sending message request...");
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/message/${selectedUser}`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`Failed to send message: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log('Message sent successfully:', data);
+      console.log("Message sent successfully:", data);
 
-      setMessages(prev => [...prev, data.message]);
+      setMessages((prev) => [...prev, data.message]);
 
       if (socket) {
-        console.log('Emitting message through socket');
-        socket.emit('sendMessage', {
+        console.log("Emitting message through socket");
+        socket.emit("sendMessage", {
           receiverId: selectedUser,
-          message: data.message
+          message: data.message,
         });
       } else {
-        console.warn('No socket connection available');
+        console.warn("No socket connection available");
       }
 
       await fetchUsers();
       scrollToBottom();
-
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error("Error sending message:", error);
       toast({
         title: "Error",
         description: "Failed to send message. Please try again.",
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   };
@@ -379,12 +401,12 @@ const Messages = () => {
     }
   };
 
-  const filteredUsers = users.filter(user => 
-    (user.email?.toLowerCase().includes(searchQuery.toLowerCase()))
+  const filteredUsers = users.filter((user) =>
+    user.email?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   useEffect(() => {
-    console.log('Current users:', users);
+    console.log("Current users:", users);
   }, [users]);
 
   useEffect(() => {
@@ -420,69 +442,73 @@ const Messages = () => {
   }, [selectedUser]);
 
   useEffect(() => {
-    const userData = localStorage.getItem('user');
+    const userData = localStorage.getItem("user");
     if (userData) {
       try {
         const parsedUser = JSON.parse(userData);
         setCurrentUserData(parsedUser);
       } catch (error) {
-        console.error('Error parsing user data:', error);
+        console.error("Error parsing user data:", error);
       }
     }
   }, []);
 
   const fixImageUrl = (url: string | undefined): string => {
-    if (!url) return '';
-    if (url.includes('placeholder.svg')) return '';
-    if (url.includes('localhost:8000/users/')) {
-      return url.split('localhost:8000/users/')[1];
+    if (!url) return "";
+    if (url.includes("placeholder.svg")) return "";
+    if (url.includes("localhost:8000/users/")) {
+      return url.split("localhost:8000/users/")[1];
     }
     return url;
   };
 
   const renderUserItem = (user: User) => {
-    if (!user) return null;
+    if (!user || !user._id) return null;
 
     const isOnline = onlineUsers.includes(user._id);
     const isSelected = selectedUser === user._id;
-    const profileImage = user.profileImage && !user.profileImage.includes('placeholder.svg') 
-      ? user.profileImage 
-      : null;
+    const profileImage =
+      user.profileImage && !user.profileImage.includes("placeholder.svg")
+        ? user.profileImage
+        : null;
 
     return (
-      <button
+      <div
         key={user._id}
         onClick={() => {
           setSelectedUser(user._id);
           fetchSelectedUserDetails(user._id);
         }}
-        className={`w-full p-3 flex items-center gap-3 hover:bg-gray-50 transition-all ${
-          isSelected ? 'bg-gray-50 border-l-4 border-primary' : ''
+        className={`w-full p-3 flex items-center gap-3 hover:bg-gray-50 transition-all cursor-pointer ${
+          isSelected ? "bg-gray-50 border-l-4 border-primary" : ""
         }`}
       >
         <div className="relative flex-shrink-0">
           <Avatar className="h-12 w-12 border rounded-full">
             {profileImage ? (
-              <AvatarImage 
-                src={profileImage} 
-                alt={user.fullName || user.email || ''}
+              <AvatarImage
+                src={profileImage}
+                alt={user.fullName || user.email || ""}
                 className="object-cover"
               />
             ) : (
               <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                {user.fullName 
-                  ? user.fullName.split(' ').map(name => name[0]).join('').toUpperCase()
+                {user.fullName
+                  ? user.fullName
+                      .split(" ")
+                      .map((name) => name[0])
+                      .join("")
+                      .toUpperCase()
                   : user.email
                   ? user.email.charAt(0).toUpperCase()
-                  : '?'
-                }
+                  : "?"}
               </AvatarFallback>
             )}
-            <span 
+            <span
               className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${
-                isOnline ? 'bg-green-500' : 'bg-gray-300'
+                isOnline ? "bg-green-500" : "bg-gray-300"
               }`}
-              title={isOnline ? 'Online' : 'Offline'}
+              title={isOnline ? "Online" : "Offline"}
             />
           </Avatar>
         </div>
@@ -491,12 +517,10 @@ const Messages = () => {
           <div className="flex items-center justify-between">
             <div className="flex flex-col items-start">
               <p className="font-semibold text-gray-900 truncate">
-                {user.fullName || user.email || 'Unknown User'}
+                {user.fullName || user.email || "Unknown User"}
               </p>
               {user.fullName && user.email && (
-                <p className="text-xs text-gray-500 truncate">
-                  {user.email}
-                </p>
+                <p className="text-xs text-gray-500 truncate">{user.email}</p>
               )}
             </div>
             {user.lastMessage && (
@@ -507,12 +531,14 @@ const Messages = () => {
           </div>
           {user.lastMessage && (
             <p className="text-sm text-gray-500 truncate mt-1 text-right">
-              {user.lastMessage.senderId === currentUserData?._id ? 'You: ' : ''}
-              {user.lastMessage.text || (user.lastMessage.image ? 'Image' : '')}
+              {user.lastMessage.senderId === currentUserData?._id
+                ? "You: "
+                : ""}
+              {user.lastMessage.text || (user.lastMessage.image ? "Image" : "")}
             </p>
           )}
         </div>
-      </button>
+      </div>
     );
   };
 
@@ -523,26 +549,36 @@ const Messages = () => {
       <div className="p-4 border-b bg-white shadow-sm">
         <div className="flex items-center gap-3">
           <Avatar className="h-10 w-10 border rounded-full">
-            {selectedUserDetails.profileImage && !selectedUserDetails.profileImage.includes('placeholder.svg') ? (
-              <AvatarImage 
+            {selectedUserDetails.profileImage &&
+            !selectedUserDetails.profileImage.includes("placeholder.svg") ? (
+              <AvatarImage
                 src={selectedUserDetails.profileImage}
-                alt={selectedUserDetails.fullName || selectedUserDetails.email || ''}
+                alt={
+                  selectedUserDetails.fullName ||
+                  selectedUserDetails.email ||
+                  ""
+                }
                 className="object-cover"
               />
             ) : (
               <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                {selectedUserDetails.fullName 
-                  ? selectedUserDetails.fullName.split(' ').map(name => name[0]).join('').toUpperCase()
+                {selectedUserDetails.fullName
+                  ? selectedUserDetails.fullName
+                      .split(" ")
+                      .map((name) => name[0])
+                      .join("")
+                      .toUpperCase()
                   : selectedUserDetails.email
                   ? selectedUserDetails.email.charAt(0).toUpperCase()
-                  : '?'
-                }
+                  : "?"}
               </AvatarFallback>
             )}
           </Avatar>
           <div className="flex flex-col">
             <span className="font-semibold text-gray-900">
-              {selectedUserDetails.fullName || selectedUserDetails.email || 'Unknown User'}
+              {selectedUserDetails.fullName ||
+                selectedUserDetails.email ||
+                "Unknown User"}
             </span>
             {selectedUserDetails.fullName && selectedUserDetails.email && (
               <span className="text-xs text-gray-500">
@@ -550,7 +586,7 @@ const Messages = () => {
               </span>
             )}
             <span className="text-xs text-gray-500">
-              {onlineUsers.includes(selectedUser) ? 'Online' : 'Offline'}
+              {onlineUsers.includes(selectedUser) ? "Online" : "Offline"}
             </span>
           </div>
         </div>
@@ -585,7 +621,9 @@ const Messages = () => {
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                   </div>
                 ) : (
-                  filteredUsers.map(user => user ? renderUserItem(user) : null)
+                  filteredUsers.map((user) =>
+                    user ? renderUserItem(user) : null
+                  )
                 )}
               </div>
             </ScrollArea>
@@ -599,59 +637,73 @@ const Messages = () => {
                 {/* Messages Container */}
                 <div className="flex-1 overflow-y-auto bg-[#f0f2f5] p-4">
                   {messages.map((message, index) => {
-                    const messageIsSentByMe = message.senderId === currentUserData?._id;
+                    const messageIsSentByMe =
+                      message.senderId === currentUserData?._id;
 
                     return (
-                      <div 
-                        key={message._id} 
+                      <div
+                        key={message._id}
                         className="w-full flex mb-3"
                         style={{
-                          justifyContent: messageIsSentByMe ? 'flex-end' : 'flex-start'
+                          justifyContent: messageIsSentByMe
+                            ? "flex-end"
+                            : "flex-start",
                         }}
                       >
                         {!messageIsSentByMe && (
                           <div className="flex-shrink-0 mr-2">
                             <Avatar className="h-8 w-8">
                               {selectedUserDetails?.profileImage && (
-                                <AvatarImage 
-                                  src={fixImageUrl(selectedUserDetails.profileImage)} 
-                                  alt={selectedUserDetails.fullName || selectedUserDetails.email}
+                                <AvatarImage
+                                  src={fixImageUrl(
+                                    selectedUserDetails.profileImage
+                                  )}
+                                  alt={
+                                    selectedUserDetails.fullName ||
+                                    selectedUserDetails.email
+                                  }
                                   className="object-cover"
                                 />
                               )}
                               <AvatarFallback>
-                                {(selectedUserDetails?.fullName || selectedUserDetails?.email)?.charAt(0).toUpperCase()}
+                                {(
+                                  selectedUserDetails?.fullName ||
+                                  selectedUserDetails?.email
+                                )
+                                  ?.charAt(0)
+                                  .toUpperCase()}
                               </AvatarFallback>
                             </Avatar>
                           </div>
                         )}
 
-                        <div 
+                        <div
                           className={`max-w-[80%] ${
-                            messageIsSentByMe 
-                              ? 'bg-[#dcf8c6] rounded-lg p-3 shadow' 
-                              : 'bg-white rounded-lg p-3 shadow'
+                            messageIsSentByMe
+                              ? "bg-[#dcf8c6] rounded-lg p-3 shadow"
+                              : "bg-white rounded-lg p-3 shadow"
                           }`}
                         >
                           {!messageIsSentByMe && (
                             <div className="text-xs text-gray-600 mb-1">
-                              {selectedUserDetails?.fullName || selectedUserDetails?.email}
+                              {selectedUserDetails?.fullName ||
+                                selectedUserDetails?.email}
                             </div>
                           )}
 
                           {message.image && (
-                            <img 
-                              src={fixImageUrl(message.image)} 
-                              alt="Attached" 
+                            <img
+                              src={fixImageUrl(message.image)}
+                              alt="Attached"
                               className="max-w-full rounded mb-2 max-h-60 object-contain"
                             />
                           )}
                           {message.text && (
                             <p className="text-gray-800">{message.text}</p>
                           )}
-                          <span 
+                          <span
                             className={`text-xs text-gray-500 mt-1 block ${
-                              messageIsSentByMe ? 'text-right' : 'text-left'
+                              messageIsSentByMe ? "text-right" : "text-left"
                             }`}
                           >
                             {formatMessageDate(message.createdAt)}
@@ -698,7 +750,9 @@ const Messages = () => {
                       <Button
                         variant="outline"
                         size="icon"
-                        onClick={() => document.getElementById('image-upload')?.click()}
+                        onClick={() =>
+                          document.getElementById("image-upload")?.click()
+                        }
                         className="hover:bg-gray-100 transition-colors"
                       >
                         <ImageIcon className="h-5 w-5" />
@@ -715,7 +769,7 @@ const Messages = () => {
                         value={newMessage}
                         onChange={(e) => setNewMessage(e.target.value)}
                         onKeyPress={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
+                          if (e.key === "Enter" && !e.shiftKey) {
                             e.preventDefault();
                             sendMessage();
                           }
@@ -729,8 +783,12 @@ const Messages = () => {
             ) : (
               <div className="flex items-center justify-center h-full text-gray-500">
                 <div className="text-center">
-                  <h3 className="text-lg font-medium mb-2">Welcome to Messages</h3>
-                  <p className="text-sm text-gray-400">Select a user to start chatting</p>
+                  <h3 className="text-lg font-medium mb-2">
+                    Welcome to Messages
+                  </h3>
+                  <p className="text-sm text-gray-400">
+                    Select a user to start chatting
+                  </p>
                 </div>
               </div>
             )}
