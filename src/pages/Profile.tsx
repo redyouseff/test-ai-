@@ -1,16 +1,27 @@
-import { useEffect, useState, useRef } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { RootState } from '../redux/types';
-import { fetchProfile } from '../redux/actions/authActions';
-import { AppDispatch } from '../redux/store';
-import axios, { AxiosError } from 'axios';
-import { AnyAction } from 'redux';
-import { useToast } from '@/hooks/use-toast';
-import { FileText, User as UserIcon, Star, StarHalf, Download, File, FileImage, Trash2, Calendar } from 'lucide-react';
-import { format } from 'date-fns';
+import { useEffect, useState, useRef } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { RootState } from "../redux/types";
+import { fetchProfile } from "../redux/actions/authActions";
+import { AppDispatch } from "../redux/store";
+import axios, { AxiosError } from "axios";
+import { AnyAction } from "redux";
+import { useToast } from "@/hooks/use-toast";
+import {
+  FileText,
+  User as UserIcon,
+  Star,
+  StarHalf,
+  Download,
+  File,
+  FileImage,
+  Trash2,
+  Calendar,
+  Camera,
+} from "lucide-react";
+import { format } from "date-fns";
 
 // Components imports
-import DashboardLayout from '../components/layout/DashboardLayout';
+import DashboardLayout from "../components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -102,64 +113,68 @@ const Profile = () => {
   const user = authState.user as unknown as ExtendedUser | null;
   const { loading, error } = authState;
   const { toast } = useToast();
-  
+
   // State declarations
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingHours, setIsEditingHours] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [editedData, setEditedData] = useState<Partial<ExtendedUser>>({});
   const [editedHours, setEditedHours] = useState<WorkingHour[]>([]);
-  const [newCertification, setNewCertification] = useState('');
-  const [medicalDocuments, setMedicalDocuments] = useState<Array<{
-    _id: string;
-    fileName: string;
-    fileUrl: string;
-    fileType: string;
-    uploadDate: string;
-  }>>([]);
+  const [newCertification, setNewCertification] = useState("");
+  const [medicalDocuments, setMedicalDocuments] = useState<
+    Array<{
+      _id: string;
+      fileName: string;
+      fileUrl: string;
+      fileType: string;
+      uploadDate: string;
+    }>
+  >([]);
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const documentInputRef = useRef<HTMLInputElement>(null);
-  const [newDisease, setNewDisease] = useState('');
-  const [newMedication, setNewMedication] = useState('');
+  const [newDisease, setNewDisease] = useState("");
+  const [newMedication, setNewMedication] = useState("");
 
   // Add new state for review
   const [reviewFormData, setReviewFormData] = useState<ReviewFormData>({
     rating: 5,
-    comment: ''
+    comment: "",
   });
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [selectedRating, setSelectedRating] = useState(5);
 
   // Computed values
-  const isDoctor = user?.role === 'doctor';
+  const isDoctor = user?.role === "doctor";
 
   const fetchMedicalDocuments = async () => {
     try {
       setIsLoadingDocuments(true);
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       if (!token) {
-        throw new Error('No authentication token found');
+        throw new Error("No authentication token found");
       }
 
       const response = await axios.get<ApiResponse>(
-        'https://care-insight-api-9ed25d3ea3ea.herokuapp.com/api/v1/users/getMedicalDocuments',
+        "https://care-insight-api-9ed25d3ea3ea.herokuapp.com/api/v1/users/getMedicalDocuments",
         {
           headers: {
-            'Authorization': `Bearer ${token}`
-          }
+            Authorization: `Bearer ${token}`,
+          },
         }
       );
 
       if (response.data?.data) {
         // Transform the data to match our state structure
-        const transformedDocs = response.data.data.map((doc: MedicalDocument) => ({
-          _id: doc._id,
-          fileName: doc.fileName,
-          fileUrl: doc.fileUrl,
-          fileType: doc.fileType || 'unknown',
-          uploadDate: doc.uploadDate
-        }));
+        const transformedDocs = response.data.data.map(
+          (doc: MedicalDocument) => ({
+            _id: doc._id,
+            fileName: doc.fileName,
+            fileUrl: doc.fileUrl,
+            fileType: doc.fileType || "unknown",
+            uploadDate: doc.uploadDate,
+          })
+        );
         setMedicalDocuments(transformedDocs);
       }
     } catch (error: unknown) {
@@ -195,10 +210,18 @@ const Profile = () => {
         });
         // Only initialize working hours for doctors
         const initialHours = [
-          'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
-        ].map(day => {
-          const existingSchedule = user.workingHours?.find(h => h.day === day);
-          return existingSchedule || { day, from: '', to: '' };
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday",
+          "Sunday",
+        ].map((day) => {
+          const existingSchedule = user.workingHours?.find(
+            (h) => h.day === day
+          );
+          return existingSchedule || { day, from: "", to: "" };
         });
         setEditedHours(initialHours);
       } else {
@@ -214,65 +237,71 @@ const Profile = () => {
           bloodType: user.bloodType,
           medicalCondition: user.medicalCondition,
           chronicDiseases: user.chronicDiseases || [],
-          currentMedications: user.currentMedications || []
+          currentMedications: user.currentMedications || [],
         });
       }
       fetchMedicalDocuments();
     }
   }, [user, isDoctor]);
 
-  const handleInputChange = (name: string, value: string | string[] | number) => {
-    setEditedData(prev => ({
+  const handleInputChange = (
+    name: string,
+    value: string | string[] | number
+  ) => {
+    setEditedData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
   };
 
   const handleAddCertification = () => {
     if (newCertification.trim()) {
-      setEditedData(prev => ({
+      setEditedData((prev) => ({
         ...prev,
-        certifications: [...(prev.certifications || []), newCertification.trim()]
+        certifications: [
+          ...(prev.certifications || []),
+          newCertification.trim(),
+        ],
       }));
-      setNewCertification('');
+      setNewCertification("");
     }
   };
 
   const handleRemoveCertification = (index: number) => {
-    setEditedData(prev => ({
+    setEditedData((prev) => ({
       ...prev,
-      certifications: prev.certifications?.filter((_, i) => i !== index) || []
+      certifications: prev.certifications?.filter((_, i) => i !== index) || [],
     }));
   };
 
   const handleSaveChanges = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       if (!token) {
-        throw new Error('No authentication token found');
+        throw new Error("No authentication token found");
       }
 
       const dataToUpdate = {
-          fullName: editedData.fullName,
-          phoneNumber: editedData.phoneNumber,
-          gender: editedData.gender,
+        fullName: editedData.fullName,
+        phoneNumber: editedData.phoneNumber,
+        gender: editedData.gender,
         age: editedData.age,
         height: editedData.height,
         weight: editedData.weight,
         bloodType: editedData.bloodType,
         medicalCondition: editedData.medicalCondition,
         chronicDiseases: editedData.chronicDiseases,
-        currentMedications: editedData.currentMedications
+        currentMedications: editedData.currentMedications,
       };
 
       const response = await axios.patch(
-        'https://care-insight-api-9ed25d3ea3ea.herokuapp.com/api/v1/users/me',
+        "https://care-insight-api-9ed25d3ea3ea.herokuapp.com/api/v1/users/me",
         dataToUpdate,
         {
           headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
         }
       );
 
@@ -281,9 +310,9 @@ const Profile = () => {
           title: "Success",
           description: "Profile information has been updated successfully.",
           variant: "default",
-          className: "bg-green-500 text-white border-none"
+          className: "bg-green-500 text-white border-none",
         });
-        
+
         // Short delay before reloading to ensure the toast is visible
         setTimeout(() => {
           window.location.reload();
@@ -312,9 +341,9 @@ const Profile = () => {
     // Add full stars
     for (let i = 0; i < fullStars; i++) {
       stars.push(
-        <Star 
-          key={`star-${i}`} 
-          className="w-5 h-5 fill-yellow-400 text-yellow-400" 
+        <Star
+          key={`star-${i}`}
+          className="w-5 h-5 fill-yellow-400 text-yellow-400"
         />
       );
     }
@@ -322,9 +351,9 @@ const Profile = () => {
     // Add half star if needed
     if (hasHalfStar) {
       stars.push(
-        <StarHalf 
-          key="half-star" 
-          className="w-5 h-5 fill-yellow-400 text-yellow-400" 
+        <StarHalf
+          key="half-star"
+          className="w-5 h-5 fill-yellow-400 text-yellow-400"
         />
       );
     }
@@ -333,27 +362,32 @@ const Profile = () => {
     const emptyStars = 5 - Math.ceil(rating);
     for (let i = 0; i < emptyStars; i++) {
       stars.push(
-        <Star 
-          key={`empty-star-${i}`} 
-          className="w-5 h-5 text-gray-300" 
-        />
+        <Star key={`empty-star-${i}`} className="w-5 h-5 text-gray-300" />
       );
     }
 
     return stars;
   };
 
-  if (loading) return (
-    <DashboardLayout>
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    </DashboardLayout>
-  );
-  if (error) return <div className="text-red-500">حدث خطأ أثناء جلب البيانات: {error}</div>;
+  if (loading)
+    return (
+      <DashboardLayout>
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      </DashboardLayout>
+    );
+  if (error)
+    return (
+      <div className="text-red-500">حدث خطأ أثناء جلب البيانات: {error}</div>
+    );
   if (!user) return <div>No profile data</div>;
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
+  ) => {
     const { name, value } = e.target;
     // يمكنك هنا إضافة منطق تحديث البروفايل عبر API أو Redux إذا توفر لاحقاً
     setIsEditing(false);
@@ -387,7 +421,7 @@ const Profile = () => {
     if (!file) return;
 
     // Check file type
-    if (!file.type.startsWith('image/')) {
+    if (!file.type.startsWith("image/")) {
       toast({
         title: "Invalid file type",
         description: "Please upload an image file",
@@ -409,32 +443,32 @@ const Profile = () => {
     try {
       setIsUploading(true);
       const formData = new FormData();
-      formData.append('profileImage', file);
+      formData.append("profileImage", file);
 
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       if (!token) {
-        throw new Error('Authentication token not found');
+        throw new Error("Authentication token not found");
       }
 
       const response = await axios.post(
-        'https://care-insight-api-9ed25d3ea3ea.herokuapp.com/api/v1/users/uploadImage', 
+        "https://care-insight-api-9ed25d3ea3ea.herokuapp.com/api/v1/users/uploadImage",
         formData,
         {
           headers: {
-            'Content-Type': 'multipart/form-data',
-            'Authorization': `Bearer ${token}`
+            "Content-Type": "multipart/form-data",
+            Authorization: `Bearer ${token}`,
           },
-          withCredentials: true
+          withCredentials: true,
         }
       );
 
       if (response.status === 200) {
         dispatch({
-          type: 'UPDATE_PROFILE',
+          type: "UPDATE_PROFILE",
           payload: {
             ...user,
-            profileImage: response.data.imageUrl
-          } as ExtendedUser
+            profileImage: response.data.imageUrl,
+          } as ExtendedUser,
         });
 
         toast({
@@ -444,11 +478,11 @@ const Profile = () => {
 
         window.location.reload();
       } else {
-        throw new Error('Invalid response format from server');
+        throw new Error("Invalid response format from server");
       }
     } catch (error: unknown) {
       let errorMessage = "Failed to upload image. Please try again.";
-      
+
       if (error instanceof AxiosError && error.response?.data) {
         errorMessage = error.response.data.message || errorMessage;
       } else if (error instanceof Error) {
@@ -460,42 +494,46 @@ const Profile = () => {
         description: errorMessage,
         variant: "destructive",
       });
-      console.error('Upload error:', error);
+      console.error("Upload error:", error);
     } finally {
       setIsUploading(false);
     }
   };
 
   const formatTime = (time: string) => {
-    if (!time) return '';
-    const [hours, minutes] = time.split(':');
+    if (!time) return "";
+    const [hours, minutes] = time.split(":");
     const hour = parseInt(hours);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const ampm = hour >= 12 ? "PM" : "AM";
     const formattedHour = hour % 12 || 12;
-    return `${formattedHour.toString().padStart(2, '0')}:${minutes} ${ampm}`;
+    return `${formattedHour.toString().padStart(2, "0")}:${minutes} ${ampm}`;
   };
 
   const parseTime = (timeStr: string) => {
-    if (!timeStr) return '';
-    const [time, period] = timeStr.split(' ');
-    const [hours, minutes] = time.split(':');
+    if (!timeStr) return "";
+    const [time, period] = timeStr.split(" ");
+    const [hours, minutes] = time.split(":");
     let hour = parseInt(hours);
-    
-    if (period === 'PM' && hour !== 12) {
+
+    if (period === "PM" && hour !== 12) {
       hour += 12;
-    } else if (period === 'AM' && hour === 12) {
+    } else if (period === "AM" && hour === 12) {
       hour = 0;
     }
-    
-    return `${hour.toString().padStart(2, '0')}:${minutes}`;
+
+    return `${hour.toString().padStart(2, "0")}:${minutes}`;
   };
 
-  const handleHoursChange = (dayIndex: number, field: 'from' | 'to', value: string) => {
-    setEditedHours(prev => {
+  const handleHoursChange = (
+    dayIndex: number,
+    field: "from" | "to",
+    value: string
+  ) => {
+    setEditedHours((prev) => {
       const newHours = [...prev];
       newHours[dayIndex] = {
         ...newHours[dayIndex],
-        [field]: value
+        [field]: value,
       };
       return newHours;
     });
@@ -503,22 +541,22 @@ const Profile = () => {
 
   const handleSaveHours = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       if (!token) {
-        throw new Error('No authentication token found');
+        throw new Error("No authentication token found");
       }
 
       // Filter out days with empty schedules
-      const validHours = editedHours.filter(hour => hour.from && hour.to);
+      const validHours = editedHours.filter((hour) => hour.from && hour.to);
 
       const response = await axios.patch(
-        'https://care-insight-api-9ed25d3ea3ea.herokuapp.com/api/v1/users/updateWorkingHours',
+        "https://care-insight-api-9ed25d3ea3ea.herokuapp.com/api/v1/users/updateWorkingHours",
         { workingHours: validHours },
         {
           headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
         }
       );
 
@@ -527,27 +565,35 @@ const Profile = () => {
           title: "Success",
           description: "Working hours have been updated successfully.",
           variant: "default",
-          className: "bg-green-500 text-white border-none"
+          className: "bg-green-500 text-white border-none",
         });
         setIsEditingHours(false);
-        
+
         // Update local state with the response data
         if (response.data?.data?.workingHours) {
           const updatedHours = [
-            'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
-          ].map(day => {
-            const existingSchedule = response.data.data.workingHours.find((h: WorkingHour) => h.day === day);
-            return existingSchedule || { day, from: '', to: '' };
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+            "Sunday",
+          ].map((day) => {
+            const existingSchedule = response.data.data.workingHours.find(
+              (h: WorkingHour) => h.day === day
+            );
+            return existingSchedule || { day, from: "", to: "" };
           });
           setEditedHours(updatedHours);
-          
+
           // Update the user state in Redux
           dispatch({
-            type: 'UPDATE_PROFILE',
+            type: "UPDATE_PROFILE",
             payload: {
               ...user,
-              workingHours: response.data.data.workingHours
-            }
+              workingHours: response.data.data.workingHours,
+            },
           });
 
           // Fetch fresh profile data to ensure everything is up to date
@@ -555,22 +601,22 @@ const Profile = () => {
         }
       }
     } catch (error) {
-      console.error('Error updating working hours:', error);
+      console.error("Error updating working hours:", error);
       toast({
         title: "Error",
         description: "Failed to update working hours. Please try again.",
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   };
 
   const handleDeleteHours = (dayIndex: number) => {
-    setEditedHours(prev => {
+    setEditedHours((prev) => {
       const newHours = [...prev];
       newHours[dayIndex] = {
         ...newHours[dayIndex],
-        from: '',
-        to: ''
+        from: "",
+        to: "",
       };
       return newHours;
     });
@@ -585,12 +631,12 @@ const Profile = () => {
             <div className="flex justify-between items-center">
               <CardTitle>Personal Information</CardTitle>
               {!isEditing && (
-            <Button 
-                onClick={() => setIsEditing(true)}
+                <Button
+                  onClick={() => setIsEditing(true)}
                   className="bg-primary hover:bg-primary-dark text-white"
-              >
-                Edit Information
-              </Button>
+                >
+                  Edit Information
+                </Button>
               )}
             </div>
           </CardHeader>
@@ -601,8 +647,10 @@ const Profile = () => {
                 {isEditing ? (
                   <Input
                     name="fullName"
-                    value={editedData.fullName || user.fullName}
-                    onChange={(e) => handleInputChange('fullName', e.target.value)}
+                    value={editedData.fullName ?? user.fullName}
+                    onChange={(e) =>
+                      handleInputChange("fullName", e.target.value)
+                    }
                     className="mt-1"
                   />
                 ) : (
@@ -620,8 +668,10 @@ const Profile = () => {
                 {isEditing ? (
                   <Input
                     name="phoneNumber"
-                    value={editedData.phoneNumber || user.phoneNumber}
-                    onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
+                    value={editedData.phoneNumber ?? user.phoneNumber}
+                    onChange={(e) =>
+                      handleInputChange("phoneNumber", e.target.value)
+                    }
                     className="mt-1"
                   />
                 ) : (
@@ -633,8 +683,10 @@ const Profile = () => {
                 <Label>Gender</Label>
                 {isEditing ? (
                   <Select
-                    value={editedData.gender || user.gender}
-                    onValueChange={(value) => handleInputChange('gender', value)}
+                    value={editedData.gender ?? user.gender}
+                    onValueChange={(value) =>
+                      handleInputChange("gender", value)
+                    }
                   >
                     <SelectTrigger className="mt-1">
                       <SelectValue placeholder="Select gender" />
@@ -655,66 +707,84 @@ const Profile = () => {
                   <Input
                     type="number"
                     name="age"
-                    value={editedData.age || user.age}
-                    onChange={(e) => handleInputChange('age', parseInt(e.target.value))}
+                    value={editedData.age ?? user.age}
+                    onChange={(e) =>
+                      handleInputChange("age", parseInt(e.target.value))
+                    }
                     className="mt-1"
                   />
                 ) : (
                   <p className="text-gray-700 mt-1">{user.age} years</p>
                 )}
-          </div>
+              </div>
 
-                <div>
+              <div>
                 <Label>Blood Type</Label>
                 {isEditing ? (
                   <Select
-                    value={editedData.bloodType || user.bloodType}
-                    onValueChange={(value) => handleInputChange('bloodType', value)}
+                    value={editedData.bloodType ?? user.bloodType}
+                    onValueChange={(value) =>
+                      handleInputChange("bloodType", value)
+                    }
                   >
                     <SelectTrigger className="mt-1">
                       <SelectValue placeholder="Select blood type" />
                     </SelectTrigger>
                     <SelectContent>
-                      {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map((type) => (
-                        <SelectItem key={type} value={type}>{type}</SelectItem>
-                      ))}
+                      {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map(
+                        (type) => (
+                          <SelectItem key={type} value={type}>
+                            {type}
+                          </SelectItem>
+                        )
+                      )}
                     </SelectContent>
                   </Select>
                 ) : (
-                  <p className="text-gray-700 mt-1">{user.bloodType || 'Not specified'}</p>
+                  <p className="text-gray-700 mt-1">
+                    {user.bloodType || "Not specified"}
+                  </p>
                 )}
-                </div>
+              </div>
 
-                <div>
+              <div>
                 <Label>Height (cm)</Label>
                 {isEditing ? (
                   <Input
                     type="number"
                     name="height"
-                    value={editedData.height || user.height}
-                    onChange={(e) => handleInputChange('height', parseInt(e.target.value))}
+                    value={editedData.height ?? user.height}
+                    onChange={(e) =>
+                      handleInputChange("height", parseInt(e.target.value))
+                    }
                     className="mt-1"
                   />
                 ) : (
-                  <p className="text-gray-700 mt-1">{user.height || 'Not specified'} cm</p>
+                  <p className="text-gray-700 mt-1">
+                    {user.height || "Not specified"} cm
+                  </p>
                 )}
-                </div>
+              </div>
 
-                <div>
+              <div>
                 <Label>Weight (kg)</Label>
                 {isEditing ? (
                   <Input
                     type="number"
                     name="weight"
-                    value={editedData.weight || user.weight}
-                    onChange={(e) => handleInputChange('weight', parseInt(e.target.value))}
+                    value={editedData.weight ?? user.weight}
+                    onChange={(e) =>
+                      handleInputChange("weight", parseInt(e.target.value))
+                    }
                     className="mt-1"
                   />
                 ) : (
-                  <p className="text-gray-700 mt-1">{user.weight || 'Not specified'} kg</p>
+                  <p className="text-gray-700 mt-1">
+                    {user.weight || "Not specified"} kg
+                  </p>
                 )}
-                </div>
               </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -730,12 +800,16 @@ const Profile = () => {
                 {isEditing ? (
                   <Input
                     name="medicalCondition"
-                    value={editedData.medicalCondition || user.medicalCondition}
-                    onChange={(e) => handleInputChange('medicalCondition', e.target.value)}
+                    value={editedData.medicalCondition ?? user.medicalCondition}
+                    onChange={(e) =>
+                      handleInputChange("medicalCondition", e.target.value)
+                    }
                     className="mt-1"
                   />
                 ) : (
-                  <p className="text-gray-700 mt-1">{user.medicalCondition || 'Not specified'}</p>
+                  <p className="text-gray-700 mt-1">
+                    {user.medicalCondition || "Not specified"}
+                  </p>
                 )}
               </div>
 
@@ -755,9 +829,17 @@ const Profile = () => {
                           type="button"
                           onClick={() => {
                             if (newDisease.trim()) {
-                              const updatedDiseases = [...(editedData.chronicDiseases || user.chronicDiseases || []), newDisease.trim()];
-                              handleInputChange('chronicDiseases', updatedDiseases);
-                              setNewDisease('');
+                              const updatedDiseases = [
+                                ...(editedData.chronicDiseases ||
+                                  user.chronicDiseases ||
+                                  []),
+                                newDisease.trim(),
+                              ];
+                              handleInputChange(
+                                "chronicDiseases",
+                                updatedDiseases
+                              );
+                              setNewDisease("");
                             }
                           }}
                         >
@@ -765,29 +847,44 @@ const Profile = () => {
                         </Button>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        {(editedData.chronicDiseases || user.chronicDiseases || []).map((disease, index) => (
+                        {(
+                          editedData.chronicDiseases ||
+                          user.chronicDiseases ||
+                          []
+                        ).map((disease, index) => (
                           <Badge
                             key={index}
                             variant="secondary"
                             className="cursor-pointer"
                             onClick={() => {
-                              const updatedDiseases = (editedData.chronicDiseases || user.chronicDiseases || []).filter((_, i) => i !== index);
-                              handleInputChange('chronicDiseases', updatedDiseases);
+                              const updatedDiseases = (
+                                editedData.chronicDiseases ||
+                                user.chronicDiseases ||
+                                []
+                              ).filter((_, i) => i !== index);
+                              handleInputChange(
+                                "chronicDiseases",
+                                updatedDiseases
+                              );
                             }}
                           >
                             {disease} ×
-                    </Badge>
-                  ))}
+                          </Badge>
+                        ))}
                       </div>
                     </div>
                   ) : (
                     <div className="flex flex-wrap gap-2">
                       {user.chronicDiseases?.length ? (
                         user.chronicDiseases.map((disease, index) => (
-                          <Badge key={index} variant="secondary">{disease}</Badge>
+                          <Badge key={index} variant="secondary">
+                            {disease}
+                          </Badge>
                         ))
                       ) : (
-                        <p className="text-gray-500">No chronic diseases recorded</p>
+                        <p className="text-gray-500">
+                          No chronic diseases recorded
+                        </p>
                       )}
                     </div>
                   )}
@@ -810,9 +907,17 @@ const Profile = () => {
                           type="button"
                           onClick={() => {
                             if (newMedication.trim()) {
-                              const updatedMedications = [...(editedData.currentMedications || user.currentMedications || []), newMedication.trim()];
-                              handleInputChange('currentMedications', updatedMedications);
-                              setNewMedication('');
+                              const updatedMedications = [
+                                ...(editedData.currentMedications ||
+                                  user.currentMedications ||
+                                  []),
+                                newMedication.trim(),
+                              ];
+                              handleInputChange(
+                                "currentMedications",
+                                updatedMedications
+                              );
+                              setNewMedication("");
                             }
                           }}
                         >
@@ -820,88 +925,56 @@ const Profile = () => {
                         </Button>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        {(editedData.currentMedications || user.currentMedications || []).map((medication, index) => (
+                        {(
+                          editedData.currentMedications ||
+                          user.currentMedications ||
+                          []
+                        ).map((medication, index) => (
                           <Badge
                             key={index}
                             variant="outline"
                             className="cursor-pointer"
                             onClick={() => {
-                              const updatedMedications = (editedData.currentMedications || user.currentMedications || []).filter((_, i) => i !== index);
-                              handleInputChange('currentMedications', updatedMedications);
+                              const updatedMedications = (
+                                editedData.currentMedications ||
+                                user.currentMedications ||
+                                []
+                              ).filter((_, i) => i !== index);
+                              handleInputChange(
+                                "currentMedications",
+                                updatedMedications
+                              );
                             }}
                           >
                             {medication} ×
-                    </Badge>
-                  ))}
+                          </Badge>
+                        ))}
                       </div>
                     </div>
                   ) : (
                     <div className="flex flex-wrap gap-2">
                       {user.currentMedications?.length ? (
                         user.currentMedications.map((medication, index) => (
-                          <Badge key={index} variant="outline">{medication}</Badge>
+                          <Badge key={index} variant="outline">
+                            {medication}
+                          </Badge>
                         ))
                       ) : (
-                    <p className="text-gray-500">No current medications</p>
+                        <p className="text-gray-500">No current medications</p>
+                      )}
+                    </div>
                   )}
                 </div>
-                  )}
               </div>
             </div>
-          </div>
-          </CardContent>
-        </Card>
-
-        {/* Medical Documents Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Medical Documents</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div 
-              className="p-8 border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center bg-gray-50/50 relative cursor-pointer"
-              onClick={() => documentInputRef.current?.click()}
-              onDragOver={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const file = e.dataTransfer.files?.[0];
-                if (file) {
-                  handleDocumentUpload(file);
-                }
-              }}
-            >
-              {isUploading && (
-                <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
-                  <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-        </div>
-              )}
-              <FileText size={40} className="text-gray-400 mb-3" />
-              <p className="font-medium text-gray-900 mb-1">Upload a new document</p>
-              <p className="text-sm text-gray-500 mb-6">Drag and drop files here or click to browse</p>
-              <input
-                ref={documentInputRef}
-                type="file"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    handleDocumentUpload(file);
-                  }
-                }}
-                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-              />
-            </div>
-            {renderMedicalDocuments()}
           </CardContent>
         </Card>
 
         {isEditing && (
           <div className="flex justify-end space-x-4">
-            <Button variant="outline" onClick={() => setIsEditing(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setIsEditing(false)}>
+              Cancel
+            </Button>
             <Button onClick={handleSaveChanges}>Save Changes</Button>
           </div>
         )}
@@ -910,23 +983,23 @@ const Profile = () => {
   };
 
   const renderDoctorProfile = () => {
-    if (!user || user.role !== 'doctor') return null;
+    if (!user || user.role !== "doctor") return null;
     const doctor = user as ExtendedUser;
-    
+
     return (
       <div className="space-y-6">
-          {/* Professional Information */}
+        {/* Professional Information */}
         <Card>
           <CardHeader>
             <div className="flex justify-between items-center">
               <CardTitle>Professional Information</CardTitle>
               {!isEditing && (
-              <Button 
-                onClick={() => setIsEditing(true)}
+                <Button
+                  onClick={() => setIsEditing(true)}
                   className="bg-primary hover:bg-primary-dark text-white"
-              >
-                Edit Information
-              </Button>
+                >
+                  Edit Information
+                </Button>
               )}
             </div>
           </CardHeader>
@@ -937,8 +1010,10 @@ const Profile = () => {
                 {isEditing ? (
                   <Input
                     name="fullName"
-                    value={editedData.fullName || doctor.fullName}
-                    onChange={(e) => handleInputChange('fullName', e.target.value)}
+                    value={editedData.fullName ?? doctor.fullName}
+                    onChange={(e) =>
+                      handleInputChange("fullName", e.target.value)
+                    }
                     className="mt-1"
                   />
                 ) : (
@@ -956,8 +1031,10 @@ const Profile = () => {
                 {isEditing ? (
                   <Input
                     name="phoneNumber"
-                    value={editedData.phoneNumber || doctor.phoneNumber}
-                    onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
+                    value={editedData.phoneNumber ?? doctor.phoneNumber}
+                    onChange={(e) =>
+                      handleInputChange("phoneNumber", e.target.value)
+                    }
                     className="mt-1"
                   />
                 ) : (
@@ -970,8 +1047,10 @@ const Profile = () => {
                 {isEditing ? (
                   <Input
                     name="specialty"
-                    value={editedData.specialty || doctor.specialty}
-                    onChange={(e) => handleInputChange('specialty', e.target.value)}
+                    value={editedData.specialty ?? doctor.specialty}
+                    onChange={(e) =>
+                      handleInputChange("specialty", e.target.value)
+                    }
                     className="mt-1"
                   />
                 ) : (
@@ -984,40 +1063,40 @@ const Profile = () => {
                 {isEditing ? (
                   <Input
                     name="clinicLocation"
-                    value={editedData.clinicLocation || doctor.clinicLocation}
-                    onChange={(e) => handleInputChange('clinicLocation', e.target.value)}
+                    value={editedData.clinicLocation ?? doctor.clinicLocation}
+                    onChange={(e) =>
+                      handleInputChange("clinicLocation", e.target.value)
+                    }
                     className="mt-1"
                   />
                 ) : (
                   <p className="text-gray-700 mt-1">{doctor.clinicLocation}</p>
                 )}
               </div>
-                  </div>
+            </div>
           </CardContent>
         </Card>
 
-          {/* Certifications */}
+        {/* Certifications */}
         <Card>
           <CardHeader>
             <CardTitle>Certifications</CardTitle>
           </CardHeader>
-          <CardContent>
-            {renderCertificationsSection()}
-          </CardContent>
+          <CardContent>{renderCertificationsSection()}</CardContent>
         </Card>
 
-          {/* Working Hours */}
+        {/* Working Hours */}
         <Card>
           <CardHeader>
             <div className="flex justify-between items-center">
               <CardTitle>Working Hours</CardTitle>
               {!isEditingHours && (
-              <Button 
-                onClick={() => setIsEditingHours(true)}
+                <Button
+                  onClick={() => setIsEditingHours(true)}
                   className="bg-primary hover:bg-primary-dark text-white"
-              >
-                Edit Hours
-              </Button>
+                >
+                  Edit Hours
+                </Button>
               )}
             </div>
           </CardHeader>
@@ -1026,21 +1105,26 @@ const Profile = () => {
               {isEditingHours ? (
                 <div className="grid gap-4">
                   {editedHours.map((schedule, index) => (
-                    <div key={schedule.day} className="grid grid-cols-12 gap-4 items-center">
+                    <div
+                      key={schedule.day}
+                      className="grid grid-cols-12 gap-4 items-center"
+                    >
                       <div className="col-span-3">
                         <Label className="font-medium">{schedule.day}</Label>
                       </div>
                       <div className="col-span-3">
                         <Select
                           value={schedule.from}
-                          onValueChange={(value) => handleHoursChange(index, 'from', value)}
+                          onValueChange={(value) =>
+                            handleHoursChange(index, "from", value)
+                          }
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Start time" />
                           </SelectTrigger>
                           <SelectContent>
                             {Array.from({ length: 24 }, (_, i) => {
-                              const hour = i.toString().padStart(2, '0');
+                              const hour = i.toString().padStart(2, "0");
                               return (
                                 <SelectItem key={hour} value={`${hour}:00`}>
                                   {`${hour}:00`}
@@ -1054,14 +1138,16 @@ const Profile = () => {
                       <div className="col-span-3">
                         <Select
                           value={schedule.to}
-                          onValueChange={(value) => handleHoursChange(index, 'to', value)}
+                          onValueChange={(value) =>
+                            handleHoursChange(index, "to", value)
+                          }
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="End time" />
                           </SelectTrigger>
                           <SelectContent>
                             {Array.from({ length: 24 }, (_, i) => {
-                              const hour = i.toString().padStart(2, '0');
+                              const hour = i.toString().padStart(2, "0");
                               return (
                                 <SelectItem key={hour} value={`${hour}:00`}>
                                   {`${hour}:00`}
@@ -1086,38 +1172,52 @@ const Profile = () => {
                     </div>
                   ))}
                   <div className="flex justify-end space-x-4 mt-4">
-                    <Button variant="outline" onClick={() => setIsEditingHours(false)}>Cancel</Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsEditingHours(false)}
+                    >
+                      Cancel
+                    </Button>
                     <Button onClick={handleSaveHours}>Save Changes</Button>
                   </div>
                 </div>
               ) : (
                 <div className="grid gap-3">
                   {editedHours
-                    .filter(schedule => schedule.from && schedule.to)
+                    .filter((schedule) => schedule.from && schedule.to)
                     .map((schedule) => (
-                      <div key={schedule.day} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-                  <span className="font-medium w-32">{schedule.day}</span>
-                  <div className="flex gap-2">
-                    <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm">
-                      {schedule.from} - {schedule.to}
-                    </span>
-                  </div>
+                      <div
+                        key={schedule.day}
+                        className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0"
+                      >
+                        <span className="font-medium w-32">{schedule.day}</span>
+                        <div className="flex gap-2">
+                          <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm">
+                            {schedule.from} - {schedule.to}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  {editedHours.filter(
+                    (schedule) => schedule.from && schedule.to
+                  ).length === 0 && (
+                    <p className="text-center text-gray-500 py-4">
+                      No working hours set
+                    </p>
+                  )}
                 </div>
-              ))}
-                  {editedHours.filter(schedule => schedule.from && schedule.to).length === 0 && (
-                    <p className="text-center text-gray-500 py-4">No working hours set</p>
               )}
             </div>
-              )}
-          </div>
           </CardContent>
         </Card>
 
         {isEditing && (
           <div className="flex justify-end space-x-4">
-            <Button variant="outline" onClick={() => setIsEditing(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setIsEditing(false)}>
+              Cancel
+            </Button>
             <Button onClick={handleSaveChanges}>Save Changes</Button>
-        </div>
+          </div>
         )}
       </div>
     );
@@ -1135,7 +1235,9 @@ const Profile = () => {
 
   const renderCertificationsSection = () => (
     <div className="col-span-2">
-      <Label className="text-sm font-medium text-gray-500 mb-2">Certifications</Label>
+      <Label className="text-sm font-medium text-gray-500 mb-2">
+        Certifications
+      </Label>
       {isEditing ? (
         <div className="space-y-4">
           <div className="flex gap-2">
@@ -1155,7 +1257,10 @@ const Profile = () => {
           </div>
           <div className="space-y-2">
             {editedData.certifications?.map((cert, index) => (
-              <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+              <div
+                key={index}
+                className="flex items-center justify-between bg-gray-50 p-2 rounded"
+              >
                 <span>{cert}</span>
                 <Button
                   type="button"
@@ -1172,7 +1277,10 @@ const Profile = () => {
       ) : (
         <div className="space-y-1">
           {user?.certifications?.map((cert, index) => (
-            <div key={index} className="text-base text-gray-900 bg-gray-50 p-2 rounded">
+            <div
+              key={index}
+              className="text-base text-gray-900 bg-gray-50 p-2 rounded"
+            >
               {cert}
             </div>
           ))}
@@ -1184,22 +1292,22 @@ const Profile = () => {
   const handleDocumentUpload = async (file: File) => {
     try {
       setIsUploading(true);
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       if (!token) {
-        throw new Error('No authentication token found');
+        throw new Error("No authentication token found");
       }
 
       const formData = new FormData();
-      formData.append('medicalDocuments', file);
+      formData.append("medicalDocuments", file);
 
       const response = await axios.post(
-        'https://care-insight-api-9ed25d3ea3ea.herokuapp.com/api/v1/users/uploadMedicalDocuments',
+        "https://care-insight-api-9ed25d3ea3ea.herokuapp.com/api/v1/users/uploadMedicalDocuments",
         formData,
         {
           headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'multipart/form-data'
-          }
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "multipart/form-data",
+          },
         }
       );
 
@@ -1208,7 +1316,7 @@ const Profile = () => {
           title: "Success",
           description: "Document uploaded successfully.",
           variant: "default",
-          className: "bg-green-500 text-white border-none"
+          className: "bg-green-500 text-white border-none",
         });
         fetchMedicalDocuments();
       }
@@ -1234,16 +1342,16 @@ const Profile = () => {
 
   // Add helper function to get file icon
   const getFileIcon = (fileName: string) => {
-    const extension = fileName.split('.').pop()?.toLowerCase();
+    const extension = fileName.split(".").pop()?.toLowerCase();
     switch (extension) {
-      case 'pdf':
+      case "pdf":
         return <FileText className="w-10 h-10 text-red-500" />;
-      case 'doc':
-      case 'docx':
+      case "doc":
+      case "docx":
         return <File className="w-10 h-10 text-blue-500" />;
-      case 'jpg':
-      case 'jpeg':
-      case 'png':
+      case "jpg":
+      case "jpeg":
+      case "png":
         return <FileImage className="w-10 h-10 text-green-500" />;
       default:
         return <FileText className="w-10 h-10 text-gray-400" />;
@@ -1256,29 +1364,29 @@ const Profile = () => {
       const date = new Date(dateString);
       // Check if date is valid
       if (isNaN(date.getTime())) {
-        return 'Invalid date';
+        return "Invalid date";
       }
-      return format(date, 'MMM dd, yyyy');
+      return format(date, "MMM dd, yyyy");
     } catch (error) {
-      console.error('Error formatting date:', error);
-      return 'Invalid date';
+      console.error("Error formatting date:", error);
+      return "Invalid date";
     }
   };
 
   // Add delete handler function
   const handleDeleteDocument = async (documentId: string) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       if (!token) {
-        throw new Error('No authentication token found');
+        throw new Error("No authentication token found");
       }
 
       const response = await axios.delete(
         `https://care-insight-api-9ed25d3ea3ea.herokuapp.com/api/v1/users/deleteMedicalDocument/${documentId}`,
         {
           headers: {
-            'Authorization': `Bearer ${token}`
-          }
+            Authorization: `Bearer ${token}`,
+          },
         }
       );
 
@@ -1287,7 +1395,7 @@ const Profile = () => {
           title: "Success",
           description: "Document deleted successfully.",
           variant: "default",
-          className: "bg-green-500 text-white border-none"
+          className: "bg-green-500 text-white border-none",
         });
         // Refresh the documents list
         fetchMedicalDocuments();
@@ -1308,8 +1416,8 @@ const Profile = () => {
   // Modify the handleReviewSubmit function
   const handleReviewSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Form submitted'); // Debug log
-    
+    console.log("Form submitted"); // Debug log
+
     if (!reviewFormData.comment.trim()) {
       toast({
         title: "Error",
@@ -1321,55 +1429,55 @@ const Profile = () => {
 
     try {
       setIsSubmittingReview(true);
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       if (!token) {
-        throw new Error('No authentication token found');
+        throw new Error("No authentication token found");
       }
 
       // Get the doctor ID from the URL
-      const pathSegments = window.location.pathname.split('/');
+      const pathSegments = window.location.pathname.split("/");
       const doctorId = pathSegments[pathSegments.length - 1];
 
-      console.log('Sending review with data:', {
+      console.log("Sending review with data:", {
         doctorId,
         rating: selectedRating,
-        comment: reviewFormData.comment
+        comment: reviewFormData.comment,
       });
 
       const response = await axios.post(
-        'https://care-insight-api-9ed25d3ea3ea.herokuapp.com/api/v1/reviews',
+        "https://care-insight-api-9ed25d3ea3ea.herokuapp.com/api/v1/reviews",
         {
           doctorId,
           rating: selectedRating,
-          comment: reviewFormData.comment
+          comment: reviewFormData.comment,
         },
         {
           headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
         }
       );
 
-      console.log('Response:', response);
+      console.log("Response:", response);
 
       if (response.status === 201 || response.status === 200) {
         toast({
           title: "Success",
           description: "Your review has been submitted successfully.",
           variant: "default",
-          className: "bg-green-500 text-white border-none"
+          className: "bg-green-500 text-white border-none",
         });
-        
+
         // Reset form
-        setReviewFormData({ rating: 5, comment: '' });
+        setReviewFormData({ rating: 5, comment: "" });
         setSelectedRating(5);
-        
+
         // Refresh profile data to show updated rating
         dispatch(fetchProfile() as unknown as AnyAction);
       }
     } catch (error) {
-      console.error('Error submitting review:', error);
+      console.error("Error submitting review:", error);
       let errorMessage = "Failed to submit review. Please try again.";
       if (error instanceof AxiosError) {
         errorMessage = error.response?.data?.message || errorMessage;
@@ -1394,14 +1502,18 @@ const Profile = () => {
           <button
             key={rating}
             type={editable ? "button" : undefined}
-            className={`${editable ? 'cursor-pointer hover:scale-110 transition-transform' : ''}`}
+            className={`${
+              editable
+                ? "cursor-pointer hover:scale-110 transition-transform"
+                : ""
+            }`}
             onClick={editable ? () => setSelectedRating(rating) : undefined}
           >
             <Star
               className={`w-6 h-6 ${
-                rating <= (editable ? selectedRating : (user?.averageRating || 0))
-                  ? 'fill-yellow-400 text-yellow-400'
-                  : 'text-gray-300'
+                rating <= (editable ? selectedRating : user?.averageRating || 0)
+                  ? "fill-yellow-400 text-yellow-400"
+                  : "text-gray-300"
               }`}
             />
           </button>
@@ -1412,37 +1524,37 @@ const Profile = () => {
 
   const handleDownload = async (fileUrl: string, fileName: string) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       if (!token) {
-        throw new Error('No authentication token found');
+        throw new Error("No authentication token found");
       }
 
       const response = await fetch(fileUrl, {
         headers: {
-          'Authorization': `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
 
       if (!response.ok) {
-        throw new Error('Failed to download file');
+        throw new Error("Failed to download file");
       }
 
       // Get the blob from the response
       const blob = await response.blob();
-      
+
       // Create a URL for the blob
       const url = window.URL.createObjectURL(blob);
-      
+
       // Create a temporary link element
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = url;
       link.download = fileName; // Set the file name
-      
+
       // Append to body, click, and remove
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
+
       // Clean up the URL
       window.URL.revokeObjectURL(url);
 
@@ -1451,7 +1563,7 @@ const Profile = () => {
         description: "File downloaded successfully",
       });
     } catch (error) {
-      console.error('Download error:', error);
+      console.error("Download error:", error);
       toast({
         title: "Error",
         description: "Failed to download file",
@@ -1473,7 +1585,9 @@ const Profile = () => {
       return (
         <div className="text-center py-12 bg-gray-50/50 rounded-lg border-2 border-dashed border-gray-200">
           <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-          <h3 className="text-lg font-medium text-gray-900 mb-1">No Documents</h3>
+          <h3 className="text-lg font-medium text-gray-900 mb-1">
+            No Documents
+          </h3>
           <p className="text-gray-500">
             You haven't uploaded any medical documents yet.
           </p>
@@ -1525,7 +1639,9 @@ const Profile = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Profile</h1>
-            <p className="text-gray-600">Manage your personal information and documents</p>
+            <p className="text-gray-600">
+              Manage your personal information and documents
+            </p>
           </div>
         </div>
 
@@ -1534,38 +1650,46 @@ const Profile = () => {
           <CardContent className="pt-6">
             <div className="flex items-center gap-6">
               <div className="relative">
-                <div className="w-24 h-24 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden border-4 border-white shadow-lg">
+                <div
+                  className="w-24 h-24 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden border-4 border-white shadow-lg cursor-pointer hover:opacity-90 transition-opacity relative group"
+                  onClick={() => fileInputRef.current?.click()}
+                >
                   {user?.profileImage ? (
-                      <img 
-                        src={user.profileImage} 
-                        alt={user.fullName} 
-                      className="w-full h-full object-cover"
+                    <>
+                      <img
+                        src={user.profileImage}
+                        alt={user.fullName}
+                        className="w-full h-full object-cover"
                       />
-                    ) : (
-                    <UserIcon size={32} className="text-gray-300" />
-                    )}
+                      <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Camera className="w-6 h-6 text-white" />
                       </div>
-                  <input
-                  ref={fileInputRef}
-                    type="file"
-                    className="hidden"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                  />
+                    </>
+                  ) : (
+                    <UserIcon size={32} className="text-gray-300" />
+                  )}
                 </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                />
+              </div>
               <div>
-                <h2 className="text-2xl font-semibold text-gray-900">{user?.fullName}</h2>
+                <h2 className="text-2xl font-semibold text-gray-900">
+                  {user?.fullName}
+                </h2>
                 <div className="flex items-center gap-2 mt-1">
                   <Badge variant="outline" className="capitalize">
                     {user?.role}
                   </Badge>
-                  {user?.role === 'doctor' && user?.specialty && (
-                    <Badge variant="secondary">
-                      {user.specialty}
-                    </Badge>
+                  {user?.role === "doctor" && user?.specialty && (
+                    <Badge variant="secondary">{user.specialty}</Badge>
                   )}
-              </div>
-                {user?.role === 'doctor' && (
+                </div>
+                {user?.role === "doctor" && (
                   <div className="flex items-center gap-2 mt-2">
                     {renderRatingStars(false)}
                     <span className="text-sm text-gray-500">
@@ -1581,24 +1705,26 @@ const Profile = () => {
         {/* Main Content Tabs */}
         <Tabs defaultValue="profile" className="space-y-6">
           <TabsList className="bg-white border-b rounded-none w-full justify-start h-12 p-0 space-x-8">
-                      <TabsTrigger 
-                        value="profile"
+            <TabsTrigger
+              value="profile"
               className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none rounded-none h-12"
-                      >
+            >
               Profile Information
-                      </TabsTrigger>
-                      <TabsTrigger 
-                        value="documents"
+            </TabsTrigger>
+            <TabsTrigger
+              value="documents"
               className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none rounded-none h-12"
-                      >
-                        Medical Documents
-                      </TabsTrigger>
-                    </TabsList>
-                  
+            >
+              Medical Documents
+            </TabsTrigger>
+          </TabsList>
+
           <TabsContent value="profile" className="mt-6">
-            {user?.role === 'doctor' ? renderDoctorProfile() : renderPatientProfile()}
-                  </TabsContent>
-                  
+            {user?.role === "doctor"
+              ? renderDoctorProfile()
+              : renderPatientProfile()}
+          </TabsContent>
+
           <TabsContent value="documents" className="mt-6">
             <Card>
               <CardHeader>
@@ -1609,50 +1735,54 @@ const Profile = () => {
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* Upload Area */}
-                      <div 
+                <div
                   className="p-8 border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center bg-gray-50/50 relative cursor-pointer hover:bg-gray-50 transition-colors"
                   onClick={() => documentInputRef.current?.click()}
-                        onDragOver={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                        }}
-                        onDrop={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          const file = e.dataTransfer.files?.[0];
-                          if (file) {
-                            handleDocumentUpload(file);
-                          }
-                        }}
-                      >
-                        {isUploading && (
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const file = e.dataTransfer.files?.[0];
+                    if (file) {
+                      handleDocumentUpload(file);
+                    }
+                  }}
+                >
+                  {isUploading && (
                     <div className="absolute inset-0 bg-white/80 flex items-center justify-center rounded-xl">
-                            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-                          </div>
-                        )}
-                        <FileText size={40} className="text-gray-400 mb-3" />
-                        <p className="font-medium text-gray-900 mb-1">Upload a new document</p>
-                        <p className="text-sm text-gray-500 mb-6">Drag and drop files here or click to browse</p>
-                        <input 
+                      <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                  )}
+                  <FileText size={40} className="text-gray-400 mb-3" />
+                  <p className="font-medium text-gray-900 mb-1">
+                    Upload a new document
+                  </p>
+                  <p className="text-sm text-gray-500 mb-6">
+                    Drag and drop files here or click to browse
+                  </p>
+                  <input
                     ref={documentInputRef}
-                          type="file" 
-                          className="hidden" 
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              handleDocumentUpload(file);
-                            }
-                          }}
-                          accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                        />
-                      </div>
+                    type="file"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        handleDocumentUpload(file);
+                      }
+                    }}
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                  />
+                </div>
 
                 {/* Documents List */}
-                      {renderMedicalDocuments()}
+                {renderMedicalDocuments()}
               </CardContent>
             </Card>
-                  </TabsContent>
-                </Tabs>
+          </TabsContent>
+        </Tabs>
       </div>
     </DashboardLayout>
   );

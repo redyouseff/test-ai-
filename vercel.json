@@ -1,0 +1,26 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://care-insight-api-9ed25d3ea3ea.herokuapp.com/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        }
+      ]
+    }
+  ]
+}
