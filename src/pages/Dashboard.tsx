@@ -1,9 +1,15 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
-import { RootState, User, Doctor } from "../redux/types";
+import { RootState, User } from "../redux/types";
 import { AppDispatch } from "../redux/store";
 import DashboardLayout from "../components/layout/DashboardLayout";
+import {
+  mockDoctors,
+  mockPatients,
+  mockDiagnosticFiles,
+} from "../data/mockData";
+import { DoctorProfile, PatientProfile, DiagnosticFile } from "../types";
 import DashboardStats from "@/components/dashboard/DashboardStats";
 import UpcomingAppointments from "@/components/dashboard/UpcomingAppointments";
 import ConnectedUsers from "@/components/dashboard/ConnectedUsers";
@@ -20,10 +26,16 @@ import {
   FileImage,
   Trash2,
   Calendar,
-  RefreshCw,
 } from "lucide-react";
 import { fetchProfile } from "../redux/actions/authActions";
 import api from "../redux/api";
+
+interface Doctor {
+  _id: string;
+  fullName: string;
+  email: string;
+  profileImage?: string;
+}
 
 interface RecentFile {
   id: string;
@@ -47,9 +59,14 @@ interface Statistics {
   recentFiles: RecentFile[];
 }
 
-interface ExtendedUser extends User {
+interface ExtendedUser {
   _id: string;
+  id: string;
+  name: string;
+  fullName: string;
+  email: string;
   phone: string;
+  role: "patient" | "doctor";
   doctors?: Doctor[];
   patients?: Array<{
     _id: string;
@@ -58,6 +75,7 @@ interface ExtendedUser extends User {
     profileImage?: string;
     medicalCondition?: string;
   }>;
+  profileImage?: string;
   bloodType?: string;
   medications?: string[];
   chronicDiseases?: string[];
@@ -70,42 +88,58 @@ const Dashboard = () => {
   const { user } = useSelector((state: RootState) => state.auth);
   const currentUser = user as unknown as ExtendedUser;
   const [statistics, setStatistics] = useState<Statistics | null>(null);
-  const [connectedUsers, setConnectedUsers] = useState<(Doctor | User)[]>([]);
+  const [connectedUsers, setConnectedUsers] = useState<
+    (DoctorProfile | PatientProfile)[]
+  >([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchDashboardData = useCallback(async () => {
-    try {
-      setLoading(true);
-      const [statisticsResponse, profileResponse] = await Promise.all([
-        api.get("/api/v1/users/statistics"),
-        api.get("/api/v1/users/me"),
-      ]);
+  useEffect(() => {
+    const fetchStatistics = async () => {
+      try {
+        const response = await api.get("/api/v1/users/statistics");
+        setStatistics(response.data.data);
+      } catch (error) {
+        console.error("Error fetching statistics:", error);
+      }
+    };
 
-      setStatistics(statisticsResponse.data.data);
+    if (currentUser) {
+      fetchStatistics();
+    }
+  }, [currentUser]);
 
-      // Update user data in Redux and localStorage
-      const userData = profileResponse.data.data;
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    const storedToken = localStorage.getItem("token");
+
+    if (storedUser && storedToken) {
       dispatch({
         type: "AUTH_SUCCESS",
         payload: {
-          user: userData,
-          token: localStorage.getItem("token"),
+          user: JSON.parse(storedUser),
+          token: storedToken,
         },
       });
-      localStorage.setItem("user", JSON.stringify(userData));
-
       setLoading(false);
-    } catch (error) {
-      console.error("Error fetching dashboard data:", error);
-      setLoading(false);
+    } else {
+      Promise.resolve(dispatch(fetchProfile())).finally(() =>
+        setLoading(false)
+      );
     }
   }, [dispatch]);
 
+  // Add new useEffect to fetch profile data when component mounts
   useEffect(() => {
-    if (currentUser) {
-      fetchDashboardData();
-    }
-  }, [currentUser, fetchDashboardData]);
+    const refreshUserData = async () => {
+      try {
+        await dispatch(fetchProfile());
+      } catch (error) {
+        console.error("Error refreshing user data:", error);
+      }
+    };
+
+    refreshUserData();
+  }, []); // Empty dependency array means this runs once when component mounts
 
   const formatDate = (dateString: string) => {
     const options: Intl.DateTimeFormatOptions = {
@@ -157,41 +191,31 @@ const Dashboard = () => {
       <div className="space-y-8">
         {/* Header Section */}
         <div className="bg-gradient-to-r from-primary/10 to-primary/5 rounded-xl p-8 border shadow-sm">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-6">
-              <div className="w-20 h-20 rounded-full bg-white shadow-md flex items-center justify-center border-4 border-white">
-                {currentUser.profileImage ? (
-                  <img
-                    src={currentUser.profileImage}
-                    alt={currentUser.fullName}
-                    className="w-full h-full rounded-full object-cover"
-                  />
-                ) : (
-                  <span className="text-3xl font-bold text-primary">
-                    {currentUser.fullName.charAt(0)}
-                  </span>
-                )}
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                  Welcome back, {currentUser.fullName}
-                </h1>
-                <p className="text-gray-600 text-lg flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-primary" />
-                  {currentUser.role === "patient"
-                    ? "Manage your appointments and health information"
-                    : "Manage your patient appointments and consultations"}
-                </p>
-              </div>
+          <div className="flex items-center gap-6">
+            <div className="w-20 h-20 rounded-full bg-white shadow-md flex items-center justify-center border-4 border-white">
+              {currentUser.profileImage ? (
+                <img
+                  src={currentUser.profileImage}
+                  alt={currentUser.fullName}
+                  className="w-full h-full rounded-full object-cover"
+                />
+              ) : (
+                <span className="text-3xl font-bold text-primary">
+                  {currentUser.fullName.charAt(0)}
+                </span>
+              )}
             </div>
-            <Button
-              variant="outline"
-              onClick={fetchDashboardData}
-              className="flex items-center gap-2"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Refresh
-            </Button>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                Welcome back, {currentUser.fullName}
+              </h1>
+              <p className="text-gray-600 text-lg flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-primary" />
+                {currentUser.role === "patient"
+                  ? "Manage your appointments and health information"
+                  : "Manage your patient appointments and consultations"}
+              </p>
+            </div>
           </div>
         </div>
 

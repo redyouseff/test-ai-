@@ -15,7 +15,6 @@ export const API_ENDPOINTS = {
 export interface Doctor {
   _id: string;
   fullName: string;
-  email: string;
   profileImage?: string;
 }
 
